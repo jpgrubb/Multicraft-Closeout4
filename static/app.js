@@ -1,5 +1,5 @@
 var state = {
-  sysType:      "wet",
+  sysType:      ["wet"],
   firePump:     false,
   testPapers:   false,
   testFiles:    [],
@@ -45,7 +45,11 @@ function readFileAsB64(file) {
   });
 }
 function allDocs() {
-  var docs = (BASE_DOCS[state.sysType] || BASE_DOCS["wet"]).slice();
+  var docs = [];
+  state.sysType.forEach(function(st) {
+    var base = BASE_DOCS[st] || [];
+    base.forEach(function(d) { if (docs.indexOf(d) === -1) docs.push(d); });
+  });
   if (state.firePump) docs.push("Fire Pump Weekly Testing Checklist");
   if (state.testPapers) {
     if (state.testFiles.length > 0) { state.testFiles.forEach(function(f){ docs.push(f.name); }); }
@@ -63,9 +67,16 @@ document.getElementById("cover-date-display").textContent = COVER_DATE;
 
 document.querySelectorAll(".sys-btn").forEach(function(btn) {
   btn.addEventListener("click", function() {
-    document.querySelectorAll(".sys-btn").forEach(function(b){ b.classList.remove("active"); });
-    btn.classList.add("active");
-    state.sysType = btn.dataset.val;
+    var val = btn.dataset.val;
+    var idx = state.sysType.indexOf(val);
+    if (idx === -1) {
+      state.sysType.push(val);
+      btn.classList.add("active");
+    } else {
+      if (state.sysType.length === 1) return;
+      state.sysType.splice(idx, 1);
+      btn.classList.remove("active");
+    }
   });
 });
 
@@ -188,7 +199,7 @@ async function generate() {
     attn:    document.getElementById("inp-attn").value.trim(),
     date:        COVER_DATE,
     subst_date:  substRaw ? fmtDate(substRaw) : COVER_DATE,
-    system_type: state.sysType,
+    system_type: state.sysType.join(","),
     fire_pump:   state.firePump,
     test_papers: state.testPapers,
     as_builts:   state.asBuilts
@@ -226,7 +237,7 @@ async function generate() {
 function renderDoneState(project) {
   document.getElementById("done-title").textContent = project + " — Closeout Ready";
   document.getElementById("done-meta").textContent  =
-    allDocs().length + " documents · " + SYS_LABELS[state.sysType] +
+    allDocs().length + " documents · " + state.sysType.map(function(s){ return SYS_LABELS[s]||s; }).join(" & ") +
     " System · " + state.pageCount + " pages · " + COVER_DATE;
   var list = document.getElementById("doc-list");
   list.innerHTML = "";
@@ -260,7 +271,7 @@ function resetAll() {
   document.getElementById("inp-subst").value = "";
   document.querySelectorAll(".sys-btn").forEach(function(b){ b.classList.remove("active"); });
   document.querySelector('.sys-btn[data-val="wet"]').classList.add("active");
-  state.sysType = "wet";
+  state.sysType = ["wet"];
   ["firepump","tests","asbuilts"].forEach(function(key) {
     var stKey = key==="firepump" ? "firePump" : key==="tests" ? "testPapers" : "asBuilts";
     state[stKey] = false;
