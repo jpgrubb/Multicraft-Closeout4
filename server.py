@@ -9,11 +9,15 @@ from pypdf import PdfWriter, PdfReader
 BASE_DIR = Path(__file__).parent
 TMPL_DIR = BASE_DIR / "templates"
 
-app = Flask(__name__, static_folder=str(BASE_DIR))
+app = Flask(__name__)
 
 @app.route("/")
 def index():
     return send_from_directory(str(BASE_DIR), "index.html")
+
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    return send_from_directory(str(BASE_DIR / "static"), filename)
 
 @app.route("/generate", methods=["POST"])
 def generate():
@@ -28,11 +32,9 @@ def generate():
         fire_pump  = data.get("fire_pump", False)
         subst_date = data.get("subst_date") or data.get("date", "")
 
-        # Cover sheet
         cover_overlay = make_cover_overlay(data, extra_items)
         filled_cover  = overlay_pdf(TMPL_DIR / "Closeout_Cover_sheet.pdf", cover_overlay, 0)
 
-        # O&M selection
         if "standpipe" in sys_type:
             om = [TMPL_DIR / "2_-_SECTION_1_Intoduction_closeout.pdf",
                   TMPL_DIR / "3_-_DRY_standpipe_-_OP.pdf"]
@@ -43,7 +45,6 @@ def generate():
             om = [TMPL_DIR / "2_-_SECTION_1_Intoduction_closeout.pdf",
                   TMPL_DIR / "3_-_WET-OP.pdf"]
 
-        # Static docs
         static = [
             TMPL_DIR / "4_-_maintenancechart.pdf",
             TMPL_DIR / "5_-_summaryofminimum.pdf",
@@ -52,11 +53,9 @@ def generate():
         if fire_pump:
             static.append(TMPL_DIR / "Fire_Pump_Testing.pdf")
 
-        # Warranty with stamped date
         warranty_overlay = make_warranty_overlay(subst_date)
         warranty_stamped = overlay_pdf(TMPL_DIR / "CLOSEOUTS_WARRANTY.pdf", warranty_overlay, 1)
 
-        # Merge everything
         writer = PdfWriter()
         for src in [BytesIO(filled_cover)] + [open(p, "rb") for p in om + static]:
             for page in PdfReader(src).pages:
@@ -131,5 +130,5 @@ def overlay_pdf(base_path, overlay_bytes, page_index=0):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
