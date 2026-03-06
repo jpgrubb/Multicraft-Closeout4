@@ -197,6 +197,8 @@ async function generate() {
     project: project,
     to:      document.getElementById("inp-to").value.trim(),
     attn:    document.getElementById("inp-attn").value.trim(),
+    name:    document.getElementById("inp-name").value.trim(),
+    email:   document.getElementById("inp-email").value.trim(),
     date:        COVER_DATE,
     subst_date:  substRaw ? fmtDate(substRaw) : COVER_DATE,
     system_type: state.sysType.join(","),
@@ -269,6 +271,8 @@ function resetAll() {
   document.getElementById("inp-to").value    = "";
   document.getElementById("inp-attn").value  = "";
   document.getElementById("inp-subst").value = "";
+  document.getElementById("inp-name").value  = "";
+  document.getElementById("inp-email").value = "";
   document.querySelectorAll(".sys-btn").forEach(function(b){ b.classList.remove("active"); });
   document.querySelector('.sys-btn[data-val="wet"]').classList.add("active");
   state.sysType = ["wet"];
