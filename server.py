@@ -99,13 +99,13 @@ def make_cover_overlay(data, extra_items):
 
     # Text fields
     c.setFont("Helvetica", 10)
-    c.drawString(71,  y(133),   data.get("to",      ""))
-    c.drawString(312, y(133),   data.get("date",     ""))
-    c.drawString(76,  y(199),   data.get("attn",     ""))
-    c.drawString(325, y(197),   data.get("project",  ""))
+    c.drawString(71,  y(133), data.get("to",     ""))
+    c.drawString(312, y(133), data.get("date",    ""))
+    c.drawString(76,  y(199), data.get("attn",    ""))
+    c.drawString(325, y(197), data.get("project", ""))
 
     # White out Jason Grubb and replace with user name
-    name = data.get("name", "Jason Grubb")
+    name = data.get("name", "")
     c.setFillColorRGB(1, 1, 1)
     c.rect(318, y(667), 180, 22, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
@@ -113,7 +113,7 @@ def make_cover_overlay(data, extra_items):
     c.drawString(321, y(664), name)
 
     # White out email and replace
-    email = data.get("email", "jason@multicraftfire.com")
+    email = data.get("email", "")
     c.setFillColorRGB(1, 1, 1)
     c.rect(200, y(548), 250, 14, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
@@ -129,10 +129,12 @@ def make_cover_overlay(data, extra_items):
     c.setFillColorRGB(0, 0, 0)
     c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
-    # Extra items in description table
-    row_tops = [310, 331, 352, 373, 394]
+    # Description table — base docs first, extras at bottom
+    base_rows = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25", "One Year Warranty"]
+    all_rows = base_rows + list(extra_items)
+    row_tops = [310, 331, 352, 373, 394, 415, 436, 457, 478, 499]
     c.setFont("Helvetica", 10)
-    for i, item in enumerate(extra_items[:5]):
+    for i, item in enumerate(all_rows[:len(row_tops)]):
         c.drawString(148, y(row_tops[i]), item)
 
     c.save(); buf.seek(0)
@@ -158,14 +160,18 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
     c.setFont("Times-Bold", 12)
     c.drawString(275, y(250), project_name + ".")
 
-    # White out Mehelena's signature
+    # White out Mehelena's embedded image signature
     c.setFillColorRGB(1, 1, 1)
-    c.rect(88, y(486), 280, 32, fill=1, stroke=0)
-    # Write user name as signature
+    c.rect(86, y(484), 300, 45, fill=1, stroke=0)
+
+    # Write user name as cursive-style signature
     if signer_name:
         c.setFillColorRGB(0, 0, 0)
-        c.setFont("Helvetica-Oblique", 16)
-        c.drawString(90, y(483), signer_name)
+        c.saveState()
+        c.transform(1, 0, 0.25, 1, 0, 0)
+        c.setFont("Times-BoldItalic", 20)
+        c.drawString(75, y(472), signer_name)
+        c.restoreState()
 
     c.save(); buf.seek(0)
     return buf.read()
