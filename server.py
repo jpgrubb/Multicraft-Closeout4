@@ -120,12 +120,14 @@ def make_cover_overlay(data, extra_items):
     c.setFont("Helvetica", 9)
     c.drawString(206, y(545), email)
 
-    # X for Closeout Documents checkbox — label at x=424.2 top=219.7, checkbox is just left of label
+    # X for Closeout Documents checkbox
+    c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica-Bold", 9)
     c.drawString(414, y(227), "x")
 
-    # X for For Your Use checkbox — label at x=167.7 top=578.3, checkbox just left
-    c.drawString(143, y(585), "x")
+    # Filled checkbox for For Your Use
+    c.setFillColorRGB(0, 0, 0)
+    c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
     # Extra items in description table
     row_tops = [310, 331, 352, 373, 394]
@@ -156,13 +158,14 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
     c.setFont("Times-Bold", 12)
     c.drawString(275, y(250), project_name + ".")
 
-    # White out existing signature and write user name as signature
+    # White out Mehelena's signature
+    c.setFillColorRGB(1, 1, 1)
+    c.rect(88, y(486), 280, 32, fill=1, stroke=0)
+    # Write user name as signature
     if signer_name:
-        c.setFillColorRGB(1, 1, 1)
-        c.rect(88, y(490), 280, 22, fill=1, stroke=0)
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica-Oblique", 16)
-        c.drawString(90, y(487), signer_name)
+        c.drawString(90, y(483), signer_name)
 
     c.save(); buf.seek(0)
     return buf.read()
