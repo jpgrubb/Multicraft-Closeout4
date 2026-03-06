@@ -1,7 +1,14 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pip install -r requirements.txt"
+buildCommand = "python3 -m pip install -r requirements.txt"
 
 [deploy]
-startCommand = "gunicorn server:app --bind 0.0.0.0:$PORT"
+startCommand = "python3 -m gunicorn server:app --bind 0.0.0.0:$PORT"
 restartPolicyType = "on_failure"
+```
+
+---
+
+**Procfile** — replace with:
+```
+web: python3 -m gunicorn server:app --bind 0.0.0.0:$PORT
