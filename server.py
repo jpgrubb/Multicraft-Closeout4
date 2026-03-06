@@ -34,7 +34,7 @@ def generate():
         subst_date   = data.get("subst_date") or data.get("date", "")
         project_name = data.get("project", "")
 
-        cover_overlay = make_cover_overlay(data, extra_items, fire_pump, test_b64s, asbuilt_b64s)
+        cover_overlay = make_cover_overlay(data, extra_items, fire_pump)
         filled_cover  = overlay_pdf(TMPL_DIR / "Closeout_Cover_sheet.pdf", cover_overlay, 0)
 
         seen_om = set()
@@ -90,7 +90,7 @@ def generate():
         return jsonify({"error": str(e)}), 500
 
 
-def make_cover_overlay(data, extra_items, fire_pump=False, test_b64s=None, asbuilt_b64s=None):
+def make_cover_overlay(data, extra_items, fire_pump=False):
     buf    = BytesIO()
     page_h = 841.89
     c      = rl_canvas.Canvas(buf, pagesize=(612, page_h))
@@ -128,32 +128,30 @@ def make_cover_overlay(data, extra_items, fire_pump=False, test_b64s=None, asbui
     c.setFillColorRGB(0, 0, 0)
     c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
-    # Build doc list in exact same order as PDF output:
-    # O&M, Maintenance Chart, Summary of Minimum, NFPA 25,
-    # Fire Pump (if selected), One Year Warranty, Test Papers, As-Builts
-    doc_list = [
-        "O&M",
-        "Maintenance Chart",
-        "Summary of Minimum",
-        "NFPA 25",
-    ]
+    # Build doc list matching exact PDF output order
+    doc_list = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25"]
     if fire_pump:
         doc_list.append("Fire Pump Testing")
     doc_list.append("One Year Warranty")
-    doc_list += list(extra_items)  # test papers / as-builts filenames
+    doc_list += list(extra_items)
 
-    # Row positions from blank template
-    row_tops = [302.2, 328.7, 354.8, 375.6, 395.5, 416.0, 436.5, 457.0, 477.5, 498.0]
+    # Table runs top=300.2 to bottom=519.8, 10 rows, 21.96pts each
+    table_top  = 300.2
+    row_height = 21.96
+    n_rows     = 10
 
-    # White out pre-printed rows to avoid duplicates
+    # White out all pre-printed rows first
     c.setFillColorRGB(1, 1, 1)
-    for top in [302.2, 328.7, 354.8, 375.6, 395.5]:
-        c.rect(137, y(top + 12), 350, 14, fill=1, stroke=0)
+    for i in range(5):
+        row_top = table_top + i * row_height
+        c.rect(137, y(row_top + row_height - 1), 350, row_height - 1, fill=1, stroke=0)
 
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 10)
-    for i, item in enumerate(doc_list[:len(row_tops)]):
-        c.drawString(138.3, y(row_tops[i] + 1), item)
+    for i, item in enumerate(doc_list[:n_rows]):
+        row_top = table_top + i * row_height
+        text_y  = row_top + row_height * 0.72
+        c.drawString(138.3, y(text_y), item)
 
     c.save(); buf.seek(0)
     return buf.read()
@@ -182,14 +180,24 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
     c.setFillColorRGB(1, 1, 1)
     c.rect(88, 307, 342, 30, fill=1, stroke=0)
 
+    # Draw full-width signature underline (x=88.6 to x=523.4, matching other lines)
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(1.2)
+    c.line(88.6, y(483.2), 523.4, y(483.2))
+
     # Write user name as cursive-style signature
     if signer_name:
         c.setFillColorRGB(0, 0, 0)
         c.saveState()
         c.transform(1, 0, 0.25, 1, 0, 0)
         c.setFont("Times-BoldItalic", 20)
-        c.drawString(75, 320, signer_name)
+        c.drawString(75, y(472), signer_name)
         c.restoreState()
+
+    # Draw full-width date underline (matching other lines)
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(1.2)
+    c.line(88.6, y(571.1), 523.4, y(571.1))
 
     c.save(); buf.seek(0)
     return buf.read()
