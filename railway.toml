@@ -4,8 +4,3 @@ builder = "nixpacks"
 [deploy]
 startCommand = "/opt/venv/bin/gunicorn server:app --bind 0.0.0.0:$PORT"
 restartPolicyType = "on_failure"
-```
-
-And update **Procfile** with this:
-```
-web: /opt/venv/bin/gunicorn server:app --bind 0.0.0.0:$PORT
