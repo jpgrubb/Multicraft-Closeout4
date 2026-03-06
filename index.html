@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multicraft Fire LLC — Closeout Package Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:    #c0392b;
+      --red-lt: #e74c3c;
+      --navy:   #1a3a5c;
+      --dark:   #0f1923;
+      --border: #dde2ea;
+      --muted:  #6b7a8d;
+      --text:   #1a2535;
+      --bg:     #f4f6f9;
+      --white:  #ffffff;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+
+    /* ── HEADER ── */
+    #header {
+      background: var(--dark);
+      border-bottom: 3px solid var(--red);
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #header .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #header .logo-icon {
+      width: 34px; height: 34px;
+      background: var(--red);
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    #header .logo-text {
+      font-family: 'Oswald', sans-serif;
+      font-size: 19px; font-weight: 700;
+      color: white; letter-spacing: 0.06em;
+    }
+    #header .logo-text span { color: var(--red-lt); }
+    #header .subtitle {
+      font-family: 'Oswald', sans-serif;
+      font-size: 10px; letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* ── MAIN GRID ── */
+    #app {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      min-height: calc(100vh - 63px);
+    }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      background: var(--white);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 63px);
+      position: sticky;
+      top: 63px;
+      overflow: hidden;
+    }
+    #sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    #sidebar-footer {
+      padding: 14px 22px;
+      border-top: 1px solid var(--border);
+      background: var(--white);
+      flex-shrink: 0;
+    }
+
+    /* ── FORM ELEMENTS ── */
+    .sec-label {
+      font-family: 'Oswald', sans-serif;
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 7px;
+      border-bottom: 1px solid var(--border);
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label {
+      font-size: 11px; font-weight: 600;
+      color: var(--muted); letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .field .req { color: var(--red); margin-left: 2px; }
+    .field .hint { font-size: 10px; color: #a0aab4; margin-top: 1px; }
+    .field input[type=text], .field input[type=date] {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid var(--border); border-radius: 5px;
+      font-family: inherit; font-size: 14px; color: var(--text);
+      background: var(--white); outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .field input:focus {
+      border-color: #2c5282;
+      box-shadow: 0 0 0 3px rgba(44,82,130,.1);
+    }
+    .auto-date {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid var(--border); border-radius: 5px;
+      font-size: 14px; color: var(--muted);
+      background: #f8f9fb;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .auto-date .auto-tag {
+      font-size: 10px; color: #a0aab4; letter-spacing: .04em;
+    }
+
+    /* ── SYSTEM TYPE BUTTONS ── */
+    #sys-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .sys-btn {
+      padding: 12px 6px;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      background: var(--white);
+      cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .sys-btn .sys-icon { font-size: 20px; }
+    .sys-btn .sys-label {
+      font-family: 'Oswald', sans-serif;
+      font-size: 13px; font-weight: 500;
+      letter-spacing: .04em; color: var(--text);
+    }
+    .sys-btn.active {
+      border-color: var(--red);
+      background: #fff5f5;
+      box-shadow: inset 0 0 0 1px var(--red);
+    }
+    .sys-btn.active .sys-label { color: var(--red); }
+
+    /* ── TOGGLES ── */
+    .toggle-wrap { display: flex; flex-direction: column; gap: 0; }
+    .toggle-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      background: #fafbfc;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .15s;
+      user-select: none;
+    }
+    .toggle-row.active {
+      background: #fff8f8;
+      border-color: rgba(192,57,43,0.4);
+    }
+    .toggle-row.square-bottom { border-radius: 8px 8px 0 0; }
+    .toggle-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .toggle-switch {
+      width: 42px; height: 23px;
+      background: #cbd5e0;
+      border-radius: 12px;
+      position: relative; flex-shrink: 0;
+      transition: background .2s;
+    }
+    .toggle-switch.on { background: var(--red); }
+    .toggle-knob {
+      position: absolute; width: 17px; height: 17px;
+      background: white; border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: left .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .toggle-switch.on .toggle-knob { left: 22px; }
+
+    /* ── UPLOAD ZONE ── */
+    .upload-panel {
+      border: 1.5px solid rgba(192,57,43,0.27);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 0 12px 12px;
+      background: #fff8f8;
+      display: none;
+    }
+    .upload-panel.visible { display: block; }
+    .drop-zone {
+      border: 2px dashed #c8d0dc;
+      border-radius: 6px;
+      padding: 10px 14px;
+      cursor: pointer;
+      background: #f5f7fa;
+      transition: all .15s;
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 8px;
+    }
+    .drop-zone:hover, .drop-zone.dragging {
+      border-color: var(--red);
+      background: #fff5f5;
+    }
+    .drop-zone .dz-icon { font-size: 17px; }
+    .drop-zone .dz-title { font-size: 12px; font-weight: 600; color: var(--text); }
+    .drop-zone .dz-sub { font-size: 11px; color: var(--muted); }
+    .file-list { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+    .file-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .file-item .fi-icon { font-size: 13px; }
+    .file-item .fi-name {
+      flex: 1; min-width: 0;
+      font-size: 12px; font-weight: 600; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .file-item .fi-size { font-size: 10px; color: var(--muted); }
+    .file-item .fi-remove {
+      background: none; border: none;
+      color: #bbb; cursor: pointer;
+      font-size: 15px; padding: 2px 5px; line-height: 1;
+    }
+    .file-item .fi-remove:hover { color: var(--red); }
+
+    /* ── GENERATE BUTTON ── */
+    #generate-btn {
+      width: 100%; padding: 14px;
+      background: var(--red); color: white;
+      border: none; border-radius: 7px;
+      font-family: 'Oswald', sans-serif;
+      font-size: 15px; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+      cursor: pointer; transition: all .15s;
+    }
+    #generate-btn:hover:not(:disabled) { background: #a93226; }
+    #generate-btn:disabled {
+      background: #cbd5e0; color: #a0aab4; cursor: not-allowed;
+    }
+
+    /* ── RIGHT PANEL ── */
+    #right-panel {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 48px 40px 80px; gap: 20px;
+    }
+
+    /* IDLE STATE */
+    #idle-state { text-align: center; max-width: 460px; }
+    #idle-state .idle-icon { font-size: 60px; margin-bottom: 14px; opacity: .3; }
+    #idle-state h2 {
+      font-family: 'Oswald', sans-serif;
+      font-size: 22px; font-weight: 500;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    #idle-state p {
+      font-size: 14px; color: #9aa5b4;
+      line-height: 1.7; margin-bottom: 24px;
+    }
+    .info-cards { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+    .info-card {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .info-card .ic-icon {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .info-card .ic-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+    .info-card .ic-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* GENERATING STATE */
+    #generating-state {
+      display: none;
+      flex-direction: column; align-items: center; gap: 14px;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e2e8f0;
+      border-top-color: var(--red);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #generating-state p {
+      font-family: 'Oswald', sans-serif;
+      font-size: 13px; color: var(--muted); letter-spacing: .07em;
+    }
+
+    /* DONE STATE */
+    #done-state {
+      display: none;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+      width: 100%; max-width: 580px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.07);
+    }
+    #done-header {
+      background: var(--navy);
+      padding: 18px 22px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    #done-header .done-icon { font-size: 28px; }
+    #done-header .done-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 18px; font-weight: 600;
+      color: white; letter-spacing: .03em;
+    }
+    #done-header .done-meta {
+      font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px;
+    }
+    #done-body { padding: 20px 22px; }
+    .doc-list-label {
+      font-size: 11px; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    #doc-list {
+      max-height: 320px; overflow-y: auto; margin-bottom: 16px;
+    }
+    .doc-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f0f4f8;
+      font-size: 13px;
+    }
+    .doc-item:last-child { border-bottom: none; }
+    .doc-num {
+      width: 21px; height: 21px;
+      background: var(--red); color: white;
+      font-size: 10px; font-weight: 700;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .doc-name { color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-check { color: #27ae60; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+    #download-btn {
+      display: block; width: 100%; padding: 12px;
+      background: var(--navy); color: white;
+      text-align: center; border-radius: 7px;
+      font-family: 'Oswald', sans-serif;
+      font-size: 15px; font-weight: 600; letter-spacing: .08em;
+      border: none; cursor: pointer; transition: all .15s;
+      text-decoration: none;
+    }
+    #download-btn:hover { background: #0e2340; }
+    #reset-btn {
+      display: block; width: 100%; padding: 9px;
+      background: transparent; color: var(--muted);
+      text-align: center; border-radius: 7px; font-size: 13px;
+      border: 1px solid var(--border); cursor: pointer; margin-top: 8px;
+      font-family: inherit; transition: all .15s;
+    }
+    #reset-btn:hover { background: #f8f9fb; }
+
+    /* ERROR STATE */
+    #error-state {
+      display: none;
+      background: #fff5f5; border: 1px solid #fed7d7;
+      border-radius: 8px; padding: 14px 18px;
+      color: #c53030; font-size: 13px;
+      max-width: 560px; width: 100%; line-height: 1.5;
+    }
+    #error-state strong { display: block; margin-bottom: 4px; }
+    #error-msg { margin-bottom: 8px; }
+    #retry-btn {
+      padding: 6px 14px; background: white;
+      border: 1px solid #fed7d7; border-radius: 4px;
+      color: #c53030; cursor: pointer; font-size: 12px;
+      font-family: inherit;
+    }
+
+    /* ── FOOTER ── */
+    #footer {
+      background: #edf2f7;
+      border-top: 1px solid var(--border);
+      padding: 7px 36px;
+      font-size: 11px; color: var(--muted);
+      letter-spacing: .04em;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: center; gap: 8px;
+      z-index: 90;
+    }
+    #footer .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%; background: #27ae60; flex-shrink: 0;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      #app { grid-template-columns: 1fr; }
+      #sidebar {
+        height: auto; position: static;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      #sidebar-scroll { max-height: 70vh; }
+      #right-panel { padding: 32px 20px 80px; }
+      #header { padding: 0 20px; }
+      #footer { padding: 7px 20px; font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="logo">
+    <div class="logo-icon">🔥</div>
+    <div class="logo-text">MULTICRAFT <span>FIRE LLC</span></div>
+  </div>
+  <div class="subtitle">Closeout Package Generator</div>
+</header>
+
+<!-- MAIN APP -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div id="sidebar-scroll">
+
+      <!-- PROJECT INFO -->
+      <div class="sec-label">Project Info</div>
+
+      <div class="field">
+        <label>Project Name <span class="req">*</span></label>
+        <input type="text" id="inp-project" placeholder="e.g. Barrett Realty"/>
+      </div>
+
+      <div class="field">
+        <label>To (General Contractor)</label>
+        <input type="text" id="inp-to" placeholder="e.g. Signature Construction"/>
+      </div>
+
+      <div class="field">
+        <label>Attn (Contact Person)</label>
+        <input type="text" id="inp-attn" placeholder="e.g. Chris Hammett"/>
+      </div>
+
+      <div class="field">
+        <label>Cover Sheet Date</label>
+        <div class="auto-date">
+          <span id="cover-date-display"></span>
+          <span class="auto-tag">AUTO</span>
+        </div>
+        <div class="hint">Always set to today — stamped automatically</div>
+      </div>
+
+      <div class="field">
+        <label>Substantial Completion Date</label>
+        <input type="date" id="inp-subst"/>
+        <div class="hint">Stamped on the One Year Warranty letter</div>
+      </div>
+
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="inp-name" placeholder="e.g. Jason Grubb"/>
+        <div class="hint">Appears as signature on cover sheet &amp; warranty letter</div>
+      </div>
+
+      <div class="field">
+        <label>Your Email</label>
+        <input type="email" id="inp-email" placeholder="e.g. jason@multicraftfire.com"/>
+        <div class="hint">Appears in the Remarks section of cover sheet</div>
+      </div>
+
+      <!-- SYSTEM TYPE -->
+      <div class="sec-label" style="margin-top:4px;">System Type <span class="req">*</span></div>
+
+      <div id="sys-grid">
+        <button class="sys-btn active" data-val="wet">
+          <span class="sys-icon">💧</span>
+          <span class="sys-label">Wet Pipe</span>
+        </button>
+        <button class="sys-btn" data-val="dry">
+          <span class="sys-icon">💨</span>
+          <span class="sys-label">Dry Pipe</span>
+        </button>
+        <button class="sys-btn" data-val="pre-action">
+          <span class="sys-icon">⚡</span>
+          <span class="sys-label">Pre-Action</span>
+        </button>
+        <button class="sys-btn" data-val="dry standpipe">
+          <span class="sys-icon">🔧</span>
+          <span class="sys-label">Dry Standpipe</span>
+        </button>
+      </div>
+
+      <!-- OPTIONS -->
+      <div class="sec-label" style="margin-top:4px;">Options</div>
+
+      <!-- Fire Pump -->
+      <div class="toggle-row" id="toggle-firepump" data-key="firepump">
+        <div>
+          <div class="toggle-label">Fire Pump Testing</div>
+          <div class="toggle-sub">Appends weekly test checklist · Added to cover sheet</div>
+        </div>
+        <div class="toggle-switch" id="sw-firepump"><div class="toggle-knob"></div></div>
+      </div>
+
+      <!-- Test Papers -->
+      <div class="toggle-wrap">
+        <div class="toggle-row" id="toggle-tests" data-key="tests">
+          <div>
+            <div class="toggle-label">Test Papers</div>
+            <div class="toggle-sub" id="sub-tests">Toggle on to include · Upload PDFs optionally · Added to cover sheet</div>
+          </div>
+          <div class="toggle-switch" id="sw-tests"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="upload-panel" id="panel-tests">
+          <div class="drop-zone" id="dz-tests">
+            <span class="dz-icon">📎</span>
+            <div>
+              <div class="dz-title">Upload PDFs</div>
+              <div class="dz-sub">Drag &amp; drop or click to browse</div>
+            </div>
+            <input type="file" id="file-tests" accept=".pdf,application/pdf" multiple style="display:none"/>
+          </div>
+          <div class="file-list" id="list-tests"></div>
+        </div>
+      </div>
+
+      <!-- As-Builts -->
+      <div class="toggle-wrap">
+        <div class="toggle-row" id="toggle-asbuilts" data-key="asbuilts">
+          <div>
+            <div class="toggle-label">As-Built Drawings</div>
+            <div class="toggle-sub" id="sub-asbuilts">Toggle on to include · Upload PDFs optionally · Added to cover sheet</div>
+          </div>
+          <div class="toggle-switch" id="sw-asbuilts"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="upload-panel" id="panel-asbuilts">
+          <div class="drop-zone" id="dz-asbuilts">
+            <span class="dz-icon">📎</span>
+            <div>
+              <div class="dz-title">Upload PDFs</div>
+              <div class="dz-sub">Drag &amp; drop or click to browse</div>
+            </div>
+            <input type="file" id="file-asbuilts" accept=".pdf,application/pdf" multiple style="display:none"/>
+          </div>
+          <div class="file-list" id="list-asbuilts"></div>
+        </div>
+      </div>
+
+    </div><!-- end sidebar-scroll -->
+
+    <div id="sidebar-footer">
+      <button id="generate-btn" disabled>Generate Closeout Package</button>
+    </div>
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <main id="right-panel">
+
+    <!-- IDLE -->
+    <div id="idle-state">
+      <div class="idle-icon">📋</div>
+      <h2>Ready When You Are</h2>
+      <p>Fill in the project info, choose a system type, toggle any optional documents, then hit <strong>Generate</strong>.</p>
+      <div class="info-cards">
+        <div class="info-card">
+          <div class="ic-icon" style="background:rgba(26,58,92,.1)">📋</div>
+          <div>
+            <div class="ic-title">Cover Sheet</div>
+            <div class="ic-desc">Auto-filled with today's date. Toggled items are written into the description table.</div>
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="ic-icon" style="background:rgba(39,103,73,.1)">📖</div>
+          <div>
+            <div class="ic-title">O&amp;M Manual</div>
+            <div class="ic-desc">Correct version auto-selected for Wet, Dry, Pre-Action, or Standpipe.</div>
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="ic-icon" style="background:rgba(192,57,43,.1)">📜</div>
+          <div>
+            <div class="ic-title">Warranty Letter</div>
+            <div class="ic-desc">Substantial completion date stamped directly onto the document.</div>
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="ic-icon" style="background:rgba(123,52,30,.1)">🔥</div>
+          <div>
+            <div class="ic-title">Fire Pump / Tests / As-Builts</div>
+            <div class="ic-desc">Toggle on to include in package and auto-add to cover sheet. Upload PDFs to append them.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GENERATING -->
+    <div id="generating-state">
+      <div class="spinner"></div>
+      <p>Assembling package…</p>
+    </div>
+
+    <!-- DONE -->
+    <div id="done-state">
+      <div id="done-header">
+        <div class="done-icon">✅</div>
+        <div>
+          <div class="done-title" id="done-title">Project — Closeout Ready</div>
+          <div class="done-meta" id="done-meta"></div>
+        </div>
+      </div>
+      <div id="done-body">
+        <div class="doc-list-label">Documents Assembled (in order)</div>
+        <div id="doc-list"></div>
+        <button id="download-btn">⬇&nbsp;&nbsp;Download PDF Package</button>
+        <button id="reset-btn">Generate Another Package</button>
+      </div>
+    </div>
+
+    <!-- ERROR -->
+    <div id="error-state">
+      <strong>⚠ Generation Error</strong>
+      <div id="error-msg"></div>
+      <button id="retry-btn">Try Again</button>
+    </div>
+
+  </main>
+</div>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <div class="dot"></div>
+  Multicraft Fire LLC &nbsp;·&nbsp; 320 W Country Club Dr., Bloomington IN 47403 &nbsp;·&nbsp; (812) 822-9071 &nbsp;·&nbsp; jason@multicraftfire.com
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
