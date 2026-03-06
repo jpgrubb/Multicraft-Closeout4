@@ -95,7 +95,7 @@ def make_cover_overlay(data, extra_items):
     page_h = 841.89
     c      = rl_canvas.Canvas(buf, pagesize=(612, page_h))
     def y(top): return page_h - top
-    c.setFont("Helvetica", 11)
+    c.setFont("Helvetica", 10)
     c.drawString(70,  y(127.9), data.get("to",      ""))
     c.drawString(320, y(127.9), data.get("date",     ""))
     c.drawString(80,  y(192.7), data.get("attn",     ""))
@@ -104,7 +104,7 @@ def make_cover_overlay(data, extra_items):
     c.drawString(413, y(216.3), "x")
     c.drawString(138, y(578.3), "x")
     row_tops = [416.4, 437.2, 458.0, 478.8, 499.6]
-    c.setFont("Helvetica", 10.5)
+    c.setFont("Helvetica", 10)
     for i, item in enumerate(extra_items[:5]):
         c.drawString(138.3, y(row_tops[i]), item)
     c.save(); buf.seek(0)
@@ -115,18 +115,18 @@ def make_warranty_overlay(subst_date, project_name="", page_h=792.0):
     buf = BytesIO()
     c   = rl_canvas.Canvas(buf, pagesize=(612, page_h))
     def y(top): return page_h - top
-    # Stamp substantial completion date
+    # White out xx/xx/xx and stamp date in matching Helvetica 12
     c.setFillColorRGB(1, 1, 1)
-    c.rect(88, y(562), 120, 14, fill=1, stroke=0)
+    c.rect(88, y(572), 130, 16, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(90, y(559), subst_date)
-    # Stamp project name after "for the"
+    c.setFont("Helvetica", 12)
+    c.drawString(90, y(569), subst_date)
+    # White out blank after "for the" and stamp project name in matching Times-Bold 12
     c.setFillColorRGB(1, 1, 1)
-    c.rect(270, y(244), 220, 14, fill=1, stroke=0)
+    c.rect(270, y(253), 220, 16, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(275, y(241), project_name + ".")
+    c.setFont("Times-Bold", 12)
+    c.drawString(275, y(250), project_name + ".")
     c.save(); buf.seek(0)
     return buf.read()
 
