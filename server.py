@@ -4,7 +4,6 @@ from pathlib import Path
 
 from flask import Flask, request, jsonify, send_from_directory
 from reportlab.pdfgen import canvas as rl_canvas
-from reportlab.lib.colors import HexColor
 from pypdf import PdfWriter, PdfReader
 
 BASE_DIR = Path(__file__).parent
@@ -35,7 +34,7 @@ def generate():
         subst_date   = data.get("subst_date") or data.get("date", "")
         project_name = data.get("project", "")
 
-        cover_overlay = make_cover_overlay(data, extra_items)
+        cover_overlay = make_cover_overlay(data, extra_items, fire_pump, test_b64s, asbuilt_b64s)
         filled_cover  = overlay_pdf(TMPL_DIR / "Closeout_Cover_sheet.pdf", cover_overlay, 0)
 
         seen_om = set()
@@ -91,23 +90,23 @@ def generate():
         return jsonify({"error": str(e)}), 500
 
 
-def make_cover_overlay(data, extra_items):
+def make_cover_overlay(data, extra_items, fire_pump=False, test_b64s=None, asbuilt_b64s=None):
     buf    = BytesIO()
     page_h = 841.89
     c      = rl_canvas.Canvas(buf, pagesize=(612, page_h))
     def y(top): return page_h - top
 
-    # Text fields
+    # To, Date, Attn, Project fields
     c.setFont("Helvetica", 10)
-    c.drawString(71,  y(133), data.get("to",     ""))
-    c.drawString(312, y(133), data.get("date",    ""))
-    c.drawString(76,  y(199), data.get("attn",    ""))
-    c.drawString(325, y(197), data.get("project", ""))
+    c.drawString(71,  y(133), data.get("to",      ""))
+    c.drawString(312, y(133), data.get("date",     ""))
+    c.drawString(76,  y(199), data.get("attn",     ""))
+    c.drawString(325, y(197), data.get("project",  ""))
 
     # White out Jason Grubb and replace with user name
     name = data.get("name", "")
     c.setFillColorRGB(1, 1, 1)
-    c.rect(318, y(667), 180, 22, fill=1, stroke=0)
+    c.rect(318, y(667), 200, 22, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 16)
     c.drawString(321, y(664), name)
@@ -115,7 +114,7 @@ def make_cover_overlay(data, extra_items):
     # White out email and replace
     email = data.get("email", "")
     c.setFillColorRGB(1, 1, 1)
-    c.rect(200, y(548), 250, 14, fill=1, stroke=0)
+    c.rect(200, y(548), 260, 14, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 9)
     c.drawString(206, y(545), email)
@@ -129,13 +128,32 @@ def make_cover_overlay(data, extra_items):
     c.setFillColorRGB(0, 0, 0)
     c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
-    # Description table — base docs first, extras at bottom
-    base_rows = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25", "One Year Warranty"]
-    all_rows = base_rows + list(extra_items)
-    row_tops = [310, 331, 352, 373, 394, 415, 436, 457, 478, 499]
+    # Build doc list in exact same order as PDF output:
+    # O&M, Maintenance Chart, Summary of Minimum, NFPA 25,
+    # Fire Pump (if selected), One Year Warranty, Test Papers, As-Builts
+    doc_list = [
+        "O&M",
+        "Maintenance Chart",
+        "Summary of Minimum",
+        "NFPA 25",
+    ]
+    if fire_pump:
+        doc_list.append("Fire Pump Testing")
+    doc_list.append("One Year Warranty")
+    doc_list += list(extra_items)  # test papers / as-builts filenames
+
+    # Row positions from blank template
+    row_tops = [302.2, 328.7, 354.8, 375.6, 395.5, 416.0, 436.5, 457.0, 477.5, 498.0]
+
+    # White out pre-printed rows to avoid duplicates
+    c.setFillColorRGB(1, 1, 1)
+    for top in [302.2, 328.7, 354.8, 375.6, 395.5]:
+        c.rect(137, y(top + 12), 350, 14, fill=1, stroke=0)
+
+    c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 10)
-    for i, item in enumerate(all_rows[:len(row_tops)]):
-        c.drawString(148, y(row_tops[i]), item)
+    for i, item in enumerate(doc_list[:len(row_tops)]):
+        c.drawString(138.3, y(row_tops[i] + 1), item)
 
     c.save(); buf.seek(0)
     return buf.read()
@@ -160,9 +178,9 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
     c.setFont("Times-Bold", 12)
     c.drawString(275, y(250), project_name + ".")
 
-    # White out Mehelena's embedded image signature
+    # White out Mehelena Dalrymple signature
     c.setFillColorRGB(1, 1, 1)
-    c.rect(86, y(484), 300, 45, fill=1, stroke=0)
+    c.rect(88, 307, 342, 30, fill=1, stroke=0)
 
     # Write user name as cursive-style signature
     if signer_name:
@@ -170,7 +188,7 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
         c.saveState()
         c.transform(1, 0, 0.25, 1, 0, 0)
         c.setFont("Times-BoldItalic", 20)
-        c.drawString(75, y(472), signer_name)
+        c.drawString(75, 320, signer_name)
         c.restoreState()
 
     c.save(); buf.seek(0)
