@@ -28,36 +28,43 @@ def generate():
         test_b64s    = body.get("testB64s", [])
         asbuilt_b64s = body.get("asbuiltB64s", [])
 
-        sys_type   = data.get("system_type", "wet").lower()
-        fire_pump  = data.get("fire_pump", False)
-        subst_date = data.get("subst_date") or data.get("date", "")
+        sys_type_raw = data.get("system_type", "wet").lower()
+        sys_types    = [s.strip() for s in sys_type_raw.split(",")]
+        fire_pump    = data.get("fire_pump", False)
+        subst_date   = data.get("subst_date") or data.get("date", "")
+        project_name = data.get("project", "")
 
         cover_overlay = make_cover_overlay(data, extra_items)
         filled_cover  = overlay_pdf(TMPL_DIR / "Closeout_Cover_sheet.pdf", cover_overlay, 0)
 
-        if "standpipe" in sys_type:
-            om = [TMPL_DIR / "2_-_SECTION_1_Intoduction_closeout.pdf",
-                  TMPL_DIR / "3_-_DRY_standpipe_-_OP.pdf"]
-        elif "dry" in sys_type or "pre" in sys_type or "deluge" in sys_type:
-            om = [TMPL_DIR / "2_-_SECTION_1_Intoduction_closeout.pdf",
-                  TMPL_DIR / "3_-_DRY-OP.pdf"]
-        else:
-            om = [TMPL_DIR / "2_-_SECTION_1_Intoduction_closeout.pdf",
-                  TMPL_DIR / "3_-_WET-OP.pdf"]
+        seen_om = set()
+        om = []
+        intro = TMPL_DIR / "2_-_SECTION_1_Intoduction_closeout.pdf"
+        om.append(intro); seen_om.add(str(intro))
 
-        static = [
+        for st in sys_types:
+            if "standpipe" in st:
+                p = TMPL_DIR / "3_-_DRY_standpipe_-_OP.pdf"
+            elif "dry" in st or "pre" in st or "deluge" in st:
+                p = TMPL_DIR / "3_-_DRY-OP.pdf"
+            else:
+                p = TMPL_DIR / "3_-_WET-OP.pdf"
+            if str(p) not in seen_om:
+                om.append(p); seen_om.add(str(p))
+
+        static_docs = [
             TMPL_DIR / "4_-_maintenancechart.pdf",
             TMPL_DIR / "5_-_summaryofminimum.pdf",
             TMPL_DIR / "NFPA25_Guidelines.pdf",
         ]
         if fire_pump:
-            static.append(TMPL_DIR / "Fire_Pump_Testing.pdf")
+            static_docs.append(TMPL_DIR / "Fire_Pump_Testing.pdf")
 
-        warranty_overlay = make_warranty_overlay(subst_date)
+        warranty_overlay = make_warranty_overlay(subst_date, project_name)
         warranty_stamped = overlay_pdf(TMPL_DIR / "CLOSEOUTS_WARRANTY.pdf", warranty_overlay, 1)
 
         writer = PdfWriter()
-        for src in [BytesIO(filled_cover)] + [open(p, "rb") for p in om + static]:
+        for src in [BytesIO(filled_cover)] + [open(p, "rb") for p in om + static_docs]:
             for page in PdfReader(src).pages:
                 writer.add_page(page)
         for page in PdfReader(BytesIO(warranty_stamped)).pages:
@@ -84,15 +91,15 @@ def generate():
 
 
 def make_cover_overlay(data, extra_items):
-    buf = BytesIO()
+    buf    = BytesIO()
     page_h = 841.89
-    c = rl_canvas.Canvas(buf, pagesize=(612, page_h))
+    c      = rl_canvas.Canvas(buf, pagesize=(612, page_h))
     def y(top): return page_h - top
     c.setFont("Helvetica", 11)
-    c.drawString(70,  y(127.9), data.get("to",     ""))
-    c.drawString(320, y(127.9), data.get("date",    ""))
-    c.drawString(80,  y(192.7), data.get("attn",    ""))
-    c.drawString(335, y(192.7), data.get("project", ""))
+    c.drawString(70,  y(127.9), data.get("to",      ""))
+    c.drawString(320, y(127.9), data.get("date",     ""))
+    c.drawString(80,  y(192.7), data.get("attn",     ""))
+    c.drawString(335, y(192.7), data.get("project",  ""))
     c.setFont("Helvetica-Bold", 12)
     c.drawString(413, y(216.3), "x")
     c.drawString(138, y(578.3), "x")
@@ -104,15 +111,22 @@ def make_cover_overlay(data, extra_items):
     return buf.read()
 
 
-def make_warranty_overlay(subst_date, page_h=792.0):
+def make_warranty_overlay(subst_date, project_name="", page_h=792.0):
     buf = BytesIO()
-    c = rl_canvas.Canvas(buf, pagesize=(612, page_h))
+    c   = rl_canvas.Canvas(buf, pagesize=(612, page_h))
     def y(top): return page_h - top
+    # Stamp substantial completion date
     c.setFillColorRGB(1, 1, 1)
     c.rect(88, y(562), 120, 14, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica", 11)
+    c.setFont("Helvetica-Bold", 11)
     c.drawString(90, y(559), subst_date)
+    # Stamp project name after "for the"
+    c.setFillColorRGB(1, 1, 1)
+    c.rect(270, y(244), 220, 14, fill=1, stroke=0)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(275, y(241), project_name + ".")
     c.save(); buf.seek(0)
     return buf.read()
 
