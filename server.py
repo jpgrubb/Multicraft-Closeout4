@@ -129,10 +129,9 @@ def make_cover_overlay(data, extra_items, fire_pump=False):
     c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
     # Build doc list matching exact PDF output order
-    doc_list = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25"]
+    doc_list = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25", "One Year Warranty"]
     if fire_pump:
         doc_list.append("Fire Pump Testing")
-    doc_list.append("One Year Warranty")
     doc_list += list(extra_items)
 
     # Table runs top=300.2 to bottom=519.8, 10 rows, 21.96pts each
@@ -180,7 +179,7 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
     c.setFillColorRGB(1, 1, 1)
     c.rect(88, 307, 342, 30, fill=1, stroke=0)
 
-    # Draw full-width signature underline (x=88.6 to x=523.4, matching other lines)
+    # Draw full-width signature underline (matching other lines x=88.6 to x=523.4)
     c.setStrokeColorRGB(0, 0, 0)
     c.setLineWidth(1.2)
     c.line(88.6, y(483.2), 523.4, y(483.2))
