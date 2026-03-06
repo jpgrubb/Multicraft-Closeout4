@@ -1,8 +1,11 @@
 [build]
 builder = "nixpacks"
-buildCommand = "python3 -m pip install -r requirements.txt"
 
 [deploy]
-startCommand = "python3 -m gunicorn server:app --bind 0.0.0.0:$PORT"
+startCommand = "/opt/venv/bin/gunicorn server:app --bind 0.0.0.0:$PORT"
 restartPolicyType = "on_failure"
+```
 
+And update **Procfile** with this:
+```
+web: /opt/venv/bin/gunicorn server:app --bind 0.0.0.0:$PORT
