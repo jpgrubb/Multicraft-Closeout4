@@ -128,13 +128,15 @@ def make_cover_overlay(data, extra_items, fire_pump=False):
     c.setFillColorRGB(0, 0, 0)
     c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
-    # Build doc list — filter out "Fire Pump Testing" from extra_items
-    # since we handle it explicitly to control position
+    # Filter out Fire Pump from extra_items to avoid duplicate
     filtered_extras = [x for x in extra_items if "Fire Pump" not in x]
 
-    doc_list = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25", "One Year Warranty"]
+    # Doc list in exact PDF order: O&M, Maintenance, Summary, NFPA,
+    # Fire Pump (if selected), One Year Warranty, then Test Papers/As-Builts
+    doc_list = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25"]
     if fire_pump:
         doc_list.append("Fire Pump Testing")
+    doc_list.append("One Year Warranty")
     doc_list += filtered_extras
 
     # Table runs top=300.2 to bottom=519.8, 10 rows, 21.96pts each
@@ -193,7 +195,7 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
         c.saveState()
         c.transform(1, 0, 0.25, 1, 0, 0)
         c.setFont("Times-BoldItalic", 20)
-        c.drawString(30, y(472), signer_name)
+        c.drawString(10, y(472), signer_name)
         c.restoreState()
 
     # Draw full-width date underline
