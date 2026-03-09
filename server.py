@@ -179,7 +179,7 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
     c.setFillColorRGB(1, 1, 1)
     c.rect(88, 307, 342, 30, fill=1, stroke=0)
 
-    # Draw full-width signature underline (matching other lines x=88.6 to x=523.4)
+    # Draw full-width signature underline
     c.setStrokeColorRGB(0, 0, 0)
     c.setLineWidth(1.2)
     c.line(88.6, y(483.2), 523.4, y(483.2))
@@ -190,10 +190,10 @@ def make_warranty_overlay(subst_date, project_name="", signer_name="", page_h=79
         c.saveState()
         c.transform(1, 0, 0.25, 1, 0, 0)
         c.setFont("Times-BoldItalic", 20)
-        c.drawString(75, y(472), signer_name)
+        c.drawString(50, y(472), signer_name)
         c.restoreState()
 
-    # Draw full-width date underline (matching other lines)
+    # Draw full-width date underline
     c.setStrokeColorRGB(0, 0, 0)
     c.setLineWidth(1.2)
     c.line(88.6, y(571.1), 523.4, y(571.1))
