@@ -1,9 +1,10 @@
 [phases.setup]
-nixPkgs = ["python3", "python312Packages.pip"]
+nixPkgs = ["python3", "python312Packages.pip", "poppler_utils", "gcc", "zlib", "libjpeg"]
 
 [phases.install]
 cmds = [
   "python3 -m venv /opt/venv",
+  "/opt/venv/bin/pip install --upgrade pip",
   "/opt/venv/bin/pip install -r requirements.txt"
 ]
 
