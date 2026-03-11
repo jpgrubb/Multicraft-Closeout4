@@ -212,7 +212,7 @@ def placard():
     try:
         body          = request.get_json(force=True)
         calc_b64      = body.get("calcB64", "")
-        placard_style = body.get("placardStyle", "v1")  # "v1" or "v2"
+        placard_style = body.get("placardStyle", "v1")
 
         if not calc_b64:
             return jsonify({"error": "No calc PDF provided"}), 400
@@ -243,23 +243,35 @@ def extract_placard_data(pdf_bytes):
     import pdfplumber
     data = {}
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        lines = pdf.pages[0].extract_text().split('\n')
+        full_text = ""
+        for page in pdf.pages:
+            full_text += (page.extract_text() or "") + "\n"
+        lines = full_text.split('\n')
 
     for i, line in enumerate(lines):
+        # Job name
         if line.startswith('Job Name:') and i+1 < len(lines):
             data['job_name'] = lines[i+1].split('  ')[0].strip()
+        # Job number → contract_no
+        if line.startswith('Job Number:') and i+1 < len(lines):
+            data['contract_no'] = lines[i+1].split('  ')[0].strip()
+        m_jn = re.search(r'Job\s*(?:Number|No\.?)[:\s]+([A-Za-z0-9\-]+)', line)
+        if m_jn and 'contract_no' not in data:
+            data['contract_no'] = m_jn.group(1).strip()
+        # Address / location
         if line.startswith('Address 1') and i+1 < len(lines):
             data['location'] = lines[i+1].strip()
         # Density + ACTUAL area
         m = re.match(r'([\d.]+)gpm/ft.*?(\d+)ft²\s*\(Actual\s*([\d.]+)ft²\)', line)
         if m:
             data['density'] = m.group(1)
-            data['area']    = m.group(3)  # actual area
+            data['area']    = m.group(3)
+        # Sprinkler count
         if i > 0 and 'Coverage Per Sprinkler' in lines[i-1]:
             parts = line.split()
             if len(parts) >= 2:
                 data['num_sprinklers'] = parts[1]
-        # Total Demand — first number on that line (e.g. "291.32 @ 62.362")
+        # Total Demand flow
         if i > 0 and 'Total Demand' in lines[i-1]:
             parts = line.split()
             if len(parts) >= 1:
@@ -267,23 +279,40 @@ def extract_placard_data(pdf_bytes):
         # System pressure
         if i > 0 and 'System Pressure Demand' in lines[i-1]:
             parts = line.split()
-            if len(parts) >= 2:
+            if len(parts) >= 1:
                 data['pressure'] = parts[0]
+        # Hose stream — look for "Hose Flow" line
+        m_hose = re.search(r'Hose\s*Flow[:\s]+([\d.]+)', line, re.IGNORECASE)
+        if m_hose:
+            data['hose_stream'] = m_hose.group(1)
+        # Also catch format: value on next line after "Hose Flow"
+        if i > 0 and re.search(r'Hose\s*Flow', lines[i-1], re.IGNORECASE):
+            parts = line.split()
+            if parts and re.match(r'[\d.]+', parts[0]):
+                data['hose_stream'] = parts[0]
         # Date from footer
-        m = re.search(r'(\d+)/(\d+)/(\d{4})', line)
-        if m and 'year' not in data:
-            data['month'] = m.group(1).zfill(2)
-            data['day']   = m.group(2).zfill(2)
-            data['year']  = m.group(3)
+        m_date = re.search(r'(\d+)/(\d+)/(\d{4})', line)
+        if m_date and 'year' not in data:
+            data['month'] = m_date.group(1).zfill(2)
+            data['day']   = m_date.group(2).zfill(2)
+            data['year']  = m_date.group(3)
+
+    # Auto-set occupancy based on density
+    if 'occupancy' not in data or not data.get('occupancy'):
+        try:
+            d = float(data.get('density', 0))
+            if d <= 0.10:
+                data['occupancy'] = 'Light Hazard'
+            elif d <= 0.20:
+                data['occupancy'] = 'Ordinary Hazard'
+        except (ValueError, TypeError):
+            pass
 
     return data
 
 
 def generate_placard(data):
-    """
-    Template V1 — 'HYDRAULIC SYSTEM' style placard
-    (existing design with density/area/flow/pressure layout)
-    """
+    """Template V1 — HYDRAULIC SYSTEM style placard"""
     from reportlab.lib.colors import HexColor, white
     from reportlab.lib.units import inch
 
@@ -327,26 +356,22 @@ def generate_placard(data):
         c.setFont("Helvetica-Bold", size)
         c.drawString(x, y, text)
 
-    # Date Installed
     lbl(0.3*inch, H-1.63*inch, "Date Installed")
     bx, by, bh = 2.1*inch, H-1.78*inch, 0.28*inch
-    box(bx,             by, 0.95*inch, bh, data.get('month',''))
-    box(bx+1.0*inch,    by, 0.72*inch, bh, data.get('day',''))
-    box(bx+1.77*inch,   by, 0.95*inch, bh, data.get('year',''))
+    box(bx,           by, 0.95*inch, bh, data.get('month',''))
+    box(bx+1.0*inch,  by, 0.72*inch, bh, data.get('day',''))
+    box(bx+1.77*inch, by, 0.95*inch, bh, data.get('year',''))
     c.setFillColor(white); c.setFont("Helvetica", 7)
     c.drawCentredString(bx+0.475*inch,           by-0.11*inch, "MONTH")
     c.drawCentredString(bx+1.0*inch+0.36*inch,   by-0.11*inch, "DAY")
     c.drawCentredString(bx+1.77*inch+0.475*inch, by-0.11*inch, "YEAR")
 
-    # Location
     lbl(0.3*inch, H-2.17*inch, "Location")
     box(1.5*inch, H-2.32*inch, 3.72*inch, 0.28*inch, data.get('location',''), fsize=8, align="left")
 
-    # No. of Sprinklers
     lbl(0.3*inch, H-2.67*inch, "No. of Sprinklers")
     box(2.45*inch, H-2.82*inch, 2.77*inch, 0.28*inch, data.get('num_sprinklers',''))
 
-    # Basis of Design
     lbl(0.3*inch, H-3.22*inch, "Basis of Design", size=14)
     c.setFillColor(white); c.setFont("Helvetica", 11)
     c.drawString(0.5*inch, H-3.57*inch, "1. Density")
@@ -360,7 +385,6 @@ def generate_placard(data):
     c.setFillColor(white); c.setFont("Helvetica", 8)
     c.drawString(4.35*inch, H-4.11*inch, "SQ.FT.")
 
-    # System Design
     lbl(0.3*inch, H-4.60*inch, "System Design", size=14)
     c.setFillColor(white); c.setFont("Helvetica", 11)
     c.drawString(0.5*inch, H-4.93*inch, "1. Water flow rate")
@@ -375,7 +399,6 @@ def generate_placard(data):
     c.setFillColor(white); c.setFont("Helvetica", 8)
     c.drawString(4.10*inch, H-5.51*inch, "PSI")
 
-    # Installed by
     lbl(0.3*inch, H-6.05*inch, "Installed by", size=14)
     box(0.3*inch, H-6.82*inch, 4.9*inch, 0.58*inch, "", fsize=16, align="center")
     c.setFillColor(RED)
@@ -388,15 +411,7 @@ def generate_placard(data):
 
 
 def generate_placard_v2(data):
-    """
-    Template V2 — 'Hydraulically Calculated System' style placard
-    Matches the red metal plate format with inline fill-in fields for:
-    job name, company print no, date, location, contract no,
-    discharge rate (gpm), area (sq ft), supply flow rate (gpm),
-    supply pressure (psi), hose stream allowance (gpm),
-    occupancy classification, commodity classification,
-    maximum storage height, and installed by.
-    """
+    """Template V2 — Hydraulically Calculated System style placard"""
     from reportlab.lib.colors import HexColor, white
     from reportlab.lib.units import inch
 
@@ -405,71 +420,67 @@ def generate_placard_v2(data):
     W, H = 5.5 * inch, 7.5 * inch
     c = rl_canvas.Canvas(buf, pagesize=(W, H))
 
-    # Background
     c.setFillColor(RED)
     c.rect(0, 0, W, H, fill=1, stroke=0)
 
-    # Border
     c.setStrokeColor(white)
     c.setLineWidth(3)
     c.rect(0.18*inch, 0.18*inch, W - 0.36*inch, H - 0.36*inch, fill=0, stroke=1)
 
-    # ── Title ──
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 17)
     c.drawCentredString(W / 2, H - 0.58*inch, "Hydraulically Calculated System")
 
-    # ── Helper: draw an inline white fill box with optional red text ──
     def field(x, y, w, h=0.22*inch, text="", fsize=9):
         c.setFillColor(white)
         c.rect(x, y, w, h, fill=1, stroke=0)
         if text:
             c.setFillColor(RED)
             c.setFont("Helvetica", fsize)
-            # vertically centre text in box
             c.drawString(x + 0.05*inch, y + h * 0.22, str(text))
 
-    # ── Helper: draw white body text ──
     def txt(x, y, text, size=9, bold=False):
         c.setFillColor(white)
         c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
         c.drawString(x, y, text)
 
-    LM = 0.32*inch   # left margin
-    RW = W - 0.64*inch  # usable width
-    FH = 0.22*inch   # standard field height
+    LM = 0.32*inch
+    RW = W - 0.64*inch
+    FH = 0.22*inch
 
-    # Row 1: "This system as shown on [job_name]"
+    # Row 1: "This system as shown on" → always Multicraft Fire
     row = H - 0.90*inch
     txt(LM, row, "This system as shown on")
     fx = LM + c.stringWidth("This system as shown on ", "Helvetica", 9)
-    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('job_name', ''))
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, "Multicraft Fire")
 
-    # Row 2: "company print no [print_no]  dated [date]"
+    # Row 2: "company print no [blank]  dated [date]"
     row -= 0.35*inch
     txt(LM, row, "company print no")
     fx = LM + c.stringWidth("company print no ", "Helvetica", 9)
-    field(fx, row - 0.04*inch, 1.1*inch, FH, data.get('print_no', ''))
+    field(fx, row - 0.04*inch, 1.1*inch, FH, "")  # always blank
     fx2 = fx + 1.1*inch + 0.08*inch
     txt(fx2, row, "dated")
     fx3 = fx2 + c.stringWidth("dated ", "Helvetica", 9)
     field(fx3, row - 0.04*inch, RW - (fx3 - LM), FH, data.get('date_calc', ''))
 
-    # Row 3: "for [project_name]"
+    # Row 3: "for [job_name]"
     row -= 0.35*inch
     txt(LM, row, "for")
     fx = LM + c.stringWidth("for ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('job_name', ''))
 
-    # Row 4: "at [location]  contract no [contract_no]"
+    # Row 4: "at [location — full width so address always fits]"
     row -= 0.35*inch
     txt(LM, row, "at")
     fx = LM + c.stringWidth("at ", "Helvetica", 9)
-    field(fx, row - 0.04*inch, 1.8*inch, FH, data.get('location', ''))
-    fx2 = fx + 1.8*inch + 0.08*inch
-    txt(fx2, row, "contract no")
-    fx3 = fx2 + c.stringWidth("contract no ", "Helvetica", 9)
-    field(fx3, row - 0.04*inch, RW - (fx3 - LM), FH, data.get('contract_no', ''))
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('location', ''), fsize=8)
+
+    # Row 4b: "contract no [job_number]" on its own line
+    row -= 0.35*inch
+    txt(LM, row, "contract no")
+    fx = LM + c.stringWidth("contract no ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('contract_no', ''))
 
     # Row 5: "is designed to discharge at a rate of [density] gpm"
     row -= 0.38*inch
@@ -505,7 +516,6 @@ def generate_placard_v2(data):
     fx2 = fx + 1.4*inch + 0.05*inch
     txt(fx2, row, "psi (bars) at the base of the riser.")
 
-    # Spacer
     row -= 0.35*inch
 
     # Row 10: "Hose stream allowance of [hose_stream] gpm (L/min)"
@@ -519,32 +529,30 @@ def generate_placard_v2(data):
     row -= 0.30*inch
     txt(LM, row, "is included in the above.")
 
-    # Spacer
     row -= 0.38*inch
 
-    # Row 12: "Occupancy classification  [field]"
+    # Row 12: "Occupancy classification [auto from density]"
     txt(LM, row, "Occupancy classification")
     fx = LM + c.stringWidth("Occupancy classification ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('occupancy', ''))
 
-    # Row 13: "Commodity classification  [field]"
+    # Row 13: "Commodity classification"
     row -= 0.35*inch
     txt(LM, row, "Commodity classification")
     fx = LM + c.stringWidth("Commodity classification ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('commodity', ''))
 
-    # Row 14: "Maximum storage height  [field]"
+    # Row 14: "Maximum storage height"
     row -= 0.35*inch
     txt(LM, row, "Maximum storage height")
     fx = LM + c.stringWidth("Maximum storage height ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('storage_height', ''))
 
-    # ── Installed by (large white box with company name) ──
+    # Installed by
     row -= 0.48*inch
     txt(LM, row, "Installed by:")
     installer_box_y = row - 0.64*inch
     field(LM, installer_box_y, RW, 0.60*inch, fsize=16)
-    # Print company name in RED inside the white box
     c.setFillColor(RED)
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(W / 2, installer_box_y + 0.60*inch * 0.3, "MULTICRAFT FIRE")
