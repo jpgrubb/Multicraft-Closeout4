@@ -25,9 +25,8 @@ var coverDateInput   = document.getElementById("inp-cover-date");
 var coverDateDisplay = document.getElementById("cover-date-display");
 (function() {
   var today = new Date();
-  var iso = today.toISOString().split("T")[0];
-  coverDateInput.value = iso;
-  coverDateDisplay.textContent = fmtDate(iso);
+  coverDateInput.value = today.toISOString().split("T")[0];
+  coverDateDisplay.textContent = fmtDate(coverDateInput.value);
 }());
 coverDateInput.addEventListener("change", function() {
   coverDateDisplay.textContent = fmtDate(coverDateInput.value);
@@ -46,8 +45,8 @@ document.querySelectorAll(".sys-btn").forEach(function(btn) {
 
 // TOGGLE SWITCHES
 function setupToggle(rowId, switchId, key, panelId) {
-  var row = document.getElementById(rowId);
-  var sw  = document.getElementById(switchId);
+  var row   = document.getElementById(rowId);
+  var sw    = document.getElementById(switchId);
   var panel = panelId ? document.getElementById(panelId) : null;
   row.addEventListener("click", function() {
     state[key] = !state[key];
@@ -116,7 +115,7 @@ function updateGenerateBtn() {
 }
 projectInput.addEventListener("input", updateGenerateBtn);
 
-// SHOW STATE
+// SHOW STATE (closeout)
 function showState(s) {
   state.status = s;
   document.getElementById("idle-state").style.display       = s === "idle"       ? "flex"  : "none";
@@ -133,7 +132,7 @@ generateBtn.addEventListener("click", async function() {
   try {
     var testB64s    = await Promise.all(state.testFiles.map(readFileAsB64));
     var asbuiltB64s = await Promise.all(state.asbuiltFiles.map(readFileAsB64));
-    var extraItems = [];
+    var extraItems  = [];
     if (state.tests) {
       if (state.testFiles.length > 0) state.testFiles.forEach(function(f) { extraItems.push(f.name.replace(/\.pdf$/i, "")); });
       else extraItems.push("Test Papers");
@@ -182,7 +181,6 @@ generateBtn.addEventListener("click", async function() {
   }
 });
 
-// DOWNLOAD CLOSEOUT
 document.getElementById("dl-btn").addEventListener("click", function() {
   var a = document.createElement("a");
   a.href = "data:application/pdf;base64," + state.pdfB64;
@@ -191,7 +189,6 @@ document.getElementById("dl-btn").addEventListener("click", function() {
   a.click();
 });
 
-// RESET CLOSEOUT
 function resetAll() {
   state.sysType = []; state.firepump = false; state.tests = false; state.asbuilts = false;
   state.testFiles = []; state.asbuiltFiles = []; state.pdfB64 = ""; state.status = "idle";
@@ -228,7 +225,7 @@ var placardState = {
   calcFile: null, pdfB64: "", status: "idle", placardStyle: "v1"
 };
 
-// SVG V1 PREVIEW
+// SVG V1
 function svgV1() {
   var R = "#C0272D";
   var s = '<svg viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">';
@@ -272,7 +269,7 @@ function svgV1() {
   return s;
 }
 
-// SVG V2 PREVIEW
+// SVG V2
 function svgV2() {
   var R = "#C0272D";
   var s = '<svg viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">';
@@ -326,7 +323,6 @@ function renderPlacardPreview(style) {
   var wrap  = document.getElementById("placard-svg-wrap");
   var badge = document.getElementById("placard-preview-badge");
   if (!wrap || !badge) return;
-  wrap.style.transition = "opacity 0.15s ease";
   wrap.style.opacity = "0";
   setTimeout(function() {
     wrap.innerHTML = style === "v2" ? svgV2() : svgV1();
@@ -412,7 +408,6 @@ async function autoExtract(file) {
     var parsed = await resp.json();
     if (parsed.error) throw new Error(parsed.error);
     if (parsed.data) populatePlacardFields(parsed.data);
-    if (parsed.pdf) { placardState.pdfB64 = parsed.pdf; showPlacardDone(); }
   } catch (err) {
     document.getElementById("placard-hint").textContent = "Auto-extract failed - please fill in fields manually.";
   }
@@ -479,7 +474,7 @@ async function generatePlacard() {
   }
 }
 
-// PLACARD DONE / STATE / RESET
+// PLACARD STATE
 function showPlacardDone() {
   var style = placardState.placardStyle === "v2" ? "Calculated System" : "Standard";
   var loc   = document.getElementById("pl-location").value || "";
@@ -491,7 +486,9 @@ function showPlacardDone() {
 
 function showPlacardState(s) {
   placardState.status = s;
-  document.getElementById("placard-idle").style.display       = s === "idle"       ? "block" : "none";
+  var preview = document.getElementById("placard-preview-wrap");
+  if (preview) preview.style.display = (s === "idle") ? "flex" : "none";
+  document.getElementById("placard-idle").style.display       = "none";
   document.getElementById("placard-generating").style.display = s === "generating" ? "flex"  : "none";
   document.getElementById("placard-done").style.display       = s === "done"       ? "block" : "none";
   document.getElementById("placard-error").style.display      = s === "error"      ? "block" : "none";
@@ -507,7 +504,9 @@ document.getElementById("placard-download-btn").addEventListener("click", functi
 });
 
 document.getElementById("placard-reset-btn").addEventListener("click", resetPlacard);
-document.getElementById("placard-retry-btn").addEventListener("click", function() { showPlacardState("idle"); });
+document.getElementById("placard-retry-btn").addEventListener("click", function() {
+  showPlacardState("idle");
+});
 
 function resetPlacard() {
   placardState.calcFile = null;
@@ -515,9 +514,15 @@ function resetPlacard() {
   document.getElementById("calc-file-info").style.display = "none";
   document.getElementById("dz-calc").style.display        = "block";
   document.getElementById("placard-hint").textContent     = "Upload a calc PDF to auto-fill fields below.";
+  var preview = document.getElementById("placard-preview-wrap");
+  if (preview) preview.style.display = "flex";
   clearPlacardFields();
   placardBtn.disabled = true;
-  showPlacardState("idle");
+  placardState.status = "idle";
+  document.getElementById("placard-idle").style.display       = "none";
+  document.getElementById("placard-generating").style.display = "none";
+  document.getElementById("placard-done").style.display       = "none";
+  document.getElementById("placard-error").style.display      = "none";
   renderPlacardPreview(placardState.placardStyle);
 }
 
