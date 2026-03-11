@@ -245,19 +245,26 @@ def extract_placard_data(pdf_bytes):
             data['job_name'] = lines[i+1].split('  ')[0].strip()
         if line.startswith('Address 1') and i+1 < len(lines):
             data['location'] = lines[i+1].strip()
-        m = re.match(r'([\d.]+)gpm/ft.*?(\d+)ft²\s*\(Actual', line)
+        # Density + ACTUAL area
+        m = re.match(r'([\d.]+)gpm/ft.*?(\d+)ft²\s*\(Actual\s*([\d.]+)ft²\)', line)
         if m:
             data['density'] = m.group(1)
-            data['area']    = m.group(2)
+            data['area']    = m.group(3)  # actual area
         if i > 0 and 'Coverage Per Sprinkler' in lines[i-1]:
             parts = line.split()
             if len(parts) >= 2:
                 data['num_sprinklers'] = parts[1]
+        # Total Demand — first number on that line (e.g. "291.32 @ 62.362")
+        if i > 0 and 'Total Demand' in lines[i-1]:
+            parts = line.split()
+            if len(parts) >= 1:
+                data['flow_rate'] = parts[0]
+        # System pressure
         if i > 0 and 'System Pressure Demand' in lines[i-1]:
             parts = line.split()
             if len(parts) >= 2:
-                data['pressure']  = parts[0]
-                data['flow_rate'] = parts[1]
+                data['pressure'] = parts[0]
+        # Date from footer
         m = re.search(r'(\d+)/(\d+)/(\d{4})', line)
         if m and 'year' not in data:
             data['month'] = m.group(1).zfill(2)
@@ -318,8 +325,8 @@ def generate_placard(data):
     box(bx+1.0*inch,    by, 0.72*inch, bh, data.get('day',''))
     box(bx+1.77*inch,   by, 0.95*inch, bh, data.get('year',''))
     c.setFillColor(white); c.setFont("Helvetica", 7)
-    c.drawCentredString(bx+0.475*inch,          by-0.11*inch, "MONTH")
-    c.drawCentredString(bx+1.0*inch+0.36*inch,  by-0.11*inch, "DAY")
+    c.drawCentredString(bx+0.475*inch,           by-0.11*inch, "MONTH")
+    c.drawCentredString(bx+1.0*inch+0.36*inch,   by-0.11*inch, "DAY")
     c.drawCentredString(bx+1.77*inch+0.475*inch, by-0.11*inch, "YEAR")
 
     # Location
@@ -374,7 +381,6 @@ def generate_placard(data):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
-
 
 
 
