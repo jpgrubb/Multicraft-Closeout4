@@ -124,7 +124,6 @@ def make_cover_overlay(data, extra_items, fire_pump=False):
     c.rect(140, y(584), 8, 8, fill=1, stroke=1)
 
     filtered_extras = [x for x in extra_items if "Fire Pump" not in x]
-
     doc_list = ["O&M", "Maintenance Chart", "Summary of Minimum", "NFPA 25"]
     if fire_pump:
         doc_list.append("Fire Pump Testing")
@@ -203,10 +202,6 @@ def overlay_pdf(base_path, overlay_bytes, page_index=0):
     return out.read()
 
 
-# ─────────────────────────────────────────
-#  HYDRAULIC PLACARD
-# ─────────────────────────────────────────
-
 @app.route("/placard", methods=["POST"])
 def placard():
     try:
@@ -239,10 +234,6 @@ def placard():
 
 
 def extract_placard_data(pdf_bytes):
-    """
-    Parse AutoSPRINK hydraulic calc PDFs (M.E.P.CAD AutoSPRINK format).
-    Labels appear on one line, values on the NEXT line — except inline cases.
-    """
     import re
     import pdfplumber
     data = {}
@@ -257,81 +248,77 @@ def extract_placard_data(pdf_bytes):
     for i, line in enumerate(lines):
         stripped = line.strip()
 
-        # Job Number (inline on header): "Job Number: M26Y-119"
+        # Job Number: "Hydraulic Overview Job Number: M26Y-119"
         m = re.search(r'Job\s+Number:\s*([A-Za-z0-9\-]+)', stripped)
         if m and 'contract_no' not in data:
             data['contract_no'] = m.group(1).strip()
 
-        # Job Name label on one line, value on next
-        if stripped == 'Job Name:' and i+1 < len(lines):
-            val = lines[i+1].strip()
-            if val and 'job_name' not in data:
-                data['job_name'] = val
+        # Job Name: label "Job Name: Phone FAX", value on next line left column
+        if re.match(r'^Job\s+Name:', stripped) and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            if nxt and 'job_name' not in data:
+                left = re.split(r'\s{2,}', nxt)[0].strip()
+                left = re.sub(r'\s+\d[\d\-\.]+$', '', left).strip()
+                if left:
+                    data['job_name'] = left
 
-        # Job Name inline: "Job Name: VIA Womens Health"
-        m = re.match(r'Job\s+Name:\s+(.+)', stripped)
-        if m and 'job_name' not in data:
-            data['job_name'] = m.group(1).strip()
+        # Address 1: label, value on next line left column
+        if re.match(r'^Address 1\b', stripped) and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            if nxt and 'location' not in data:
+                left = re.split(r'\s{2,}', nxt)[0].strip()
+                if left and not left.startswith('Address'):
+                    data['location'] = left
 
-        # Address 1 label on one line, value on next
-        if stripped == 'Address 1' and i+1 < len(lines):
-            val = lines[i+1].strip()
-            if val and 'location' not in data:
-                data['location'] = val
-
-        # Density: "0.10gpm/ft²"
+        # Density + Area: "0.10gpm/ft² 1500ft² (Actual 900.3ft²)"
         m = re.match(r'^([\d.]+)gpm/ft', stripped)
         if m and 'density' not in data:
             data['density'] = m.group(1)
+        m2 = re.search(r'\(Actual\s*([\d.]+)ft', stripped)
+        if m2 and 'area' not in data:
+            data['area'] = m2.group(1)
 
-        # Area of Application: "1500ft² (Actual 900.3ft²)"
-        m = re.search(r'(\d+(?:\.\d+)?)ft[²2]\s*\(Actual\s*([\d.]+)ft', stripped)
-        if m and 'area' not in data:
-            data['area'] = m.group(2)
-
-        # Total Demand label then "312.21 @ 51.729" on next line
-        if 'Total Demand' in stripped and i+1 < len(lines):
+        # Hose: "Most Demanding Sprinkler Data  Hose Streams" label,
+        # next line "5.6 K-Factor 16.80 at 9.000  100.00" — last number is hose
+        if 'Hose Streams' in stripped and i+1 < len(lines):
             nxt = lines[i+1].strip()
-            m = re.match(r'^([\d.]+)\s*@\s*([\d.]+)', nxt)
-            if m and 'flow_rate' not in data:
-                data['flow_rate'] = m.group(1)
-                data['pressure']  = m.group(2)
+            nums = re.findall(r'[\d.]+', nxt)
+            if nums and 'hose_stream' not in data:
+                data['hose_stream'] = nums[-1]
 
-        # System Pressure Demand label then value on next line
-        if 'System Pressure Demand' in stripped and i+1 < len(lines):
-            nxt = lines[i+1].strip()
-            m = re.match(r'^([\d.]+)', nxt)
-            if m and 'pressure' not in data:
-                data['pressure'] = m.group(1)
+        # Supplies table: "1  Water Supply  1130.00  100.00  58.000  56.000"
+        m = re.match(r'^\d+\s+Water\s+Supply\s+([\d.]+)\s+([\d.]+)', stripped)
+        if m and 'hose_stream' not in data:
+            data['hose_stream'] = m.group(2)
 
-        # Hose Streams label then value on next line
-        if re.search(r'Hose\s+Stream', stripped, re.IGNORECASE) and i+1 < len(lines):
-            nxt = lines[i+1].strip()
-            m = re.match(r'^([\d.]+)', nxt)
-            if m and 'hose_stream' not in data:
-                data['hose_stream'] = m.group(1)
-
-        # Hose Allowance At Source label then value on next line
+        # Hose Allowance At Source (page 2)
         if 'Hose Allowance At Source' in stripped and i+1 < len(lines):
             nxt = lines[i+1].strip()
             m = re.match(r'^([\d.]+)', nxt)
             if m and 'hose_stream' not in data:
                 data['hose_stream'] = m.group(1)
 
-        # Hose Flow column header then data row below
-        if 'Hose Flow(gpm)' in stripped and i+1 < len(lines):
-            nxt = lines[i+1].strip()
-            parts = nxt.split()
-            nums = [p for p in parts if re.match(r'^[\d.]+$', p)]
-            if len(nums) >= 2 and 'hose_stream' not in data:
-                data['hose_stream'] = nums[1]
-
-        # Number Of Sprinklers Calculated label then value on next line
+        # Sprinklers: "Coverage Per Sprinkler  Number Of Sprinklers Calculated..."
+        # next line "168ft²  12  0" — second token is count
         if 'Number Of Sprinklers Calculated' in stripped and i+1 < len(lines):
             nxt = lines[i+1].strip()
-            m = re.match(r'^(\d+)', nxt)
-            if m and 'num_sprinklers' not in data:
-                data['num_sprinklers'] = m.group(1)
+            parts = nxt.split()
+            if len(parts) >= 2 and 'num_sprinklers' not in data:
+                data['num_sprinklers'] = parts[1]
+
+        # System Pressure Demand: label, next line "51.729  212.21"
+        if 'System Pressure Demand' in stripped and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            m = re.match(r'^([\d.]+)', nxt)
+            if m and 'pressure' not in data:
+                data['pressure'] = m.group(1)
+
+        # Total Demand value line: "312.21 @ 51.729 +6.086..."
+        m = re.match(r'^([\d.]+)\s*@\s*([\d.]+)', stripped)
+        if m and 'flow_rate' not in data:
+            data['flow_rate'] = m.group(1)
+            if 'pressure' not in data:
+                data['pressure'] = m.group(2)
 
         # Date from footer: "3/3/2026 10:03:10AM"
         m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', stripped)
@@ -340,7 +327,7 @@ def extract_placard_data(pdf_bytes):
             data['day']   = m.group(2).zfill(2)
             data['year']  = m.group(3)
 
-    # Auto-set occupancy based on density
+    # Auto occupancy from density
     if not data.get('occupancy'):
         try:
             d = float(data.get('density', 0))
@@ -355,7 +342,6 @@ def extract_placard_data(pdf_bytes):
 
 
 def generate_placard(data):
-    """Template V1 — HYDRAULIC SYSTEM style placard"""
     from reportlab.lib.colors import HexColor, white
     from reportlab.lib.units import inch
 
@@ -366,7 +352,6 @@ def generate_placard(data):
 
     c.setFillColor(RED)
     c.rect(0, 0, W, H, fill=1, stroke=0)
-
     c.setStrokeColor(white)
     c.setLineWidth(3)
     c.rect(0.18*inch, 0.18*inch, W-0.36*inch, H-0.36*inch, fill=0, stroke=1)
@@ -454,7 +439,6 @@ def generate_placard(data):
 
 
 def generate_placard_v2(data):
-    """Template V2 — Hydraulically Calculated System style placard"""
     from reportlab.lib.colors import HexColor, white
     from reportlab.lib.units import inch
 
@@ -465,7 +449,6 @@ def generate_placard_v2(data):
 
     c.setFillColor(RED)
     c.rect(0, 0, W, H, fill=1, stroke=0)
-
     c.setStrokeColor(white)
     c.setLineWidth(3)
     c.rect(0.18*inch, 0.18*inch, W - 0.36*inch, H - 0.36*inch, fill=0, stroke=1)
