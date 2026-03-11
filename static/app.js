@@ -269,6 +269,9 @@ var placardState = {
   placardStyle: "v1"
 };
 
+// Render initial preview on load
+window.addEventListener("load", function() { renderPlacardPreview("v1"); });
+
 // ─────────────────────────────────────────
 //  TEMPLATE SELECTOR
 // ─────────────────────────────────────────
@@ -278,6 +281,7 @@ document.querySelectorAll(".tmpl-btn").forEach(function(btn) {
     btn.classList.add("active");
     placardState.placardStyle = btn.dataset.tmpl;
     applyTemplateFields(btn.dataset.tmpl);
+    renderPlacardPreview(btn.dataset.tmpl);
   });
 });
 
@@ -294,6 +298,103 @@ function applyTemplateFields(style) {
     fieldSprinklers.style.display = "";
     fieldDate.style.display       = "";
   }
+}
+
+function renderPlacardPreview(style) {
+  var wrap  = document.getElementById("placard-svg-wrap");
+  var badge = document.getElementById("placard-preview-badge");
+  if (!wrap) return;
+  wrap.style.opacity = "0";
+  wrap.style.transition = "opacity .2s";
+  setTimeout(function() {
+    wrap.innerHTML = style === "v2" ? svgV2() : svgV1();
+    badge.textContent = style === "v2" ? "📋 Calculated System Template" : "📊 Standard Template";
+    wrap.style.opacity = "1";
+  }, 180);
+}
+
+function svgV1() {
+  var R = "#C0272D";
+  var s = '<svg viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">';
+  s += '<rect width="220" height="300" fill="' + R + '" rx="4"/>';
+  s += '<rect x="5" y="5" width="210" height="290" fill="none" stroke="white" stroke-width="2" rx="3"/>';
+  s += '<text x="110" y="28" fill="white" font-size="11" font-weight="bold" text-anchor="middle">HYDRAULIC SYSTEM</text>';
+  s += '<line x1="28" y1="32" x2="192" y2="32" stroke="white" stroke-width="1"/>';
+  s += '<text x="110" y="46" fill="white" font-size="7.5" text-anchor="middle">This building is protected</text>';
+  s += '<text x="110" y="56" fill="white" font-size="7.5" text-anchor="middle">by a Hydraulically Designed</text>';
+  s += '<text x="110" y="66" fill="white" font-size="7.5" text-anchor="middle">Automatic Sprinkler System.</text>';
+  s += '<text x="14" y="84" fill="white" font-size="7" font-weight="bold">Date Installed</text>';
+  s += '<rect x="82" y="74" width="34" height="12" fill="white" rx="1"/>';
+  s += '<rect x="119" y="74" width="26" height="12" fill="white" rx="1"/>';
+  s += '<rect x="148" y="74" width="34" height="12" fill="white" rx="1"/>';
+  s += '<text x="99"  y="91" fill="white" font-size="5" text-anchor="middle">MONTH</text>';
+  s += '<text x="132" y="91" fill="white" font-size="5" text-anchor="middle">DAY</text>';
+  s += '<text x="165" y="91" fill="white" font-size="5" text-anchor="middle">YEAR</text>';
+  s += '<text x="14" y="106" fill="white" font-size="7" font-weight="bold">Location</text>';
+  s += '<rect x="55" y="96" width="145" height="12" fill="white" rx="1"/>';
+  s += '<text x="14" y="122" fill="white" font-size="7" font-weight="bold">No. of Sprinklers</text>';
+  s += '<rect x="90" y="112" width="110" height="12" fill="white" rx="1"/>';
+  s += '<text x="14" y="140" fill="white" font-size="8" font-weight="bold">Basis of Design</text>';
+  s += '<text x="20" y="155" fill="white" font-size="7">1. Density</text>';
+  s += '<rect x="68" y="145" width="100" height="12" fill="white" rx="1"/>';
+  s += '<text x="172" y="154" fill="white" font-size="5">GPM/SQ.FT.</text>';
+  s += '<text x="20" y="172" fill="white" font-size="7">2. Designed area of discharge</text>';
+  s += '<rect x="128" y="162" width="42" height="12" fill="white" rx="1"/>';
+  s += '<text x="174" y="171" fill="white" font-size="5">SQ.FT.</text>';
+  s += '<text x="14" y="190" fill="white" font-size="8" font-weight="bold">System Design</text>';
+  s += '<text x="20" y="205" fill="white" font-size="7">1. Water flow rate</text>';
+  s += '<rect x="108" y="195" width="52" height="12" fill="white" rx="1"/>';
+  s += '<text x="164" y="204" fill="white" font-size="5">GPM</text>';
+  s += '<text x="20" y="220" fill="white" font-size="7">2. Residual pressure at the</text>';
+  s += '<text x="20" y="229" fill="white" font-size="7">    base of the riser</text>';
+  s += '<rect x="108" y="218" width="52" height="12" fill="white" rx="1"/>';
+  s += '<text x="164" y="227" fill="white" font-size="5">PSI</text>';
+  s += '<text x="14" y="248" fill="white" font-size="8" font-weight="bold">Installed by</text>';
+  s += '<rect x="14" y="254" width="192" height="32" fill="white" rx="2"/>';
+  s += '<text x="110" y="274" fill="' + R + '" font-size="11" font-weight="bold" text-anchor="middle">MULTICRAFT FIRE</text>';
+  s += '</svg>';
+  return s;
+}
+
+function svgV2() {
+  var R = "#C0272D";
+  var s = '<svg viewBox="0 0 220 340" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">';
+  s += '<rect width="220" height="340" fill="' + R + '" rx="4"/>';
+  s += '<rect x="5" y="5" width="210" height="330" fill="none" stroke="white" stroke-width="2" rx="3"/>';
+  s += '<text x="110" y="24" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Hydraulically Calculated System</text>';
+  function irow(y, label, bx, bw) {
+    s += '<text x="13" y="' + y + '" fill="white" font-size="6">' + label + '</text>';
+    if (bx) s += '<rect x="' + bx + '" y="' + (y-8) + '" width="' + bw + '" height="9" fill="white" rx="1"/>';
+  }
+  irow(38,  "This system as shown on", 95, 110);
+  s += '<text x="97" y="38" fill="' + R + '" font-size="6" font-weight="bold">Multicraft Fire</text>';
+  irow(50,  "company print no", 68, 50);
+  s += '<text x="122" y="50" fill="white" font-size="6">dated</text>';
+  s += '<rect x="141" y="42" width="64" height="9" fill="white" rx="1"/>';
+  irow(62,  "for", 22, 183);
+  irow(74,  "at", 18, 187);
+  irow(86,  "contract no", 58, 147);
+  irow(100, "is designed to discharge at a rate of", 158, 38);
+  s += '<text x="200" y="100" fill="white" font-size="6">gpm</text>';
+  s += '<text x="13" y="112" fill="white" font-size="6">(L/min) per sq ft (m²) of floor area over a maximum area of</text>';
+  s += '<rect x="13" y="116" width="80" height="9" fill="white" rx="1"/>';
+  s += '<text x="97" y="124" fill="white" font-size="6">sq ft (m²) when supplied</text>';
+  irow(136, "with water at the rate of", 102, 54);
+  s += '<text x="160" y="136" fill="white" font-size="6">gpm (L/min)</text>';
+  irow(148, "at", 18, 54);
+  s += '<text x="76" y="148" fill="white" font-size="6">psi (bars) at the base of the riser.</text>';
+  s += '<text x="13" y="162" fill="white" font-size="6">Hose stream allowance of</text>';
+  s += '<rect x="103" y="154" width="56" height="9" fill="white" rx="1"/>';
+  s += '<text x="163" y="162" fill="white" font-size="6">gpm (L/min)</text>';
+  s += '<text x="13" y="174" fill="white" font-size="6">is included in the above.</text>';
+  irow(190, "Occupancy classification",  102, 103);
+  irow(204, "Commodity classification",  102, 103);
+  irow(218, "Maximum storage height",    102, 103);
+  s += '<text x="13" y="236" fill="white" font-size="6">Installed by:</text>';
+  s += '<rect x="13" y="240" width="194" height="28" fill="white" rx="2"/>';
+  s += '<text x="110" y="258" fill="' + R + '" font-size="10" font-weight="bold" text-anchor="middle">MULTICRAFT FIRE</text>';
+  s += '</svg>';
+  return s;
 }
 
 // ─────────────────────────────────────────
