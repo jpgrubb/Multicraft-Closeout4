@@ -239,66 +239,109 @@ def placard():
 
 
 def extract_placard_data(pdf_bytes):
+    """
+    Parse AutoSPRINK hydraulic calc PDFs (M.E.P.CAD AutoSPRINK format).
+    Labels appear on one line, values on the NEXT line — except inline cases.
+    """
     import re
     import pdfplumber
     data = {}
+
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         full_text = ""
         for page in pdf.pages:
             full_text += (page.extract_text() or "") + "\n"
-        lines = full_text.split('\n')
+
+    lines = [l.rstrip() for l in full_text.split('\n')]
 
     for i, line in enumerate(lines):
-        # Job name
-        if line.startswith('Job Name:') and i+1 < len(lines):
-            data['job_name'] = lines[i+1].split('  ')[0].strip()
-        # Job number → contract_no
-        if line.startswith('Job Number:') and i+1 < len(lines):
-            data['contract_no'] = lines[i+1].split('  ')[0].strip()
-        m_jn = re.search(r'Job\s*(?:Number|No\.?)[:\s]+([A-Za-z0-9\-]+)', line)
-        if m_jn and 'contract_no' not in data:
-            data['contract_no'] = m_jn.group(1).strip()
-        # Address / location
-        if line.startswith('Address 1') and i+1 < len(lines):
-            data['location'] = lines[i+1].strip()
-        # Density + ACTUAL area
-        m = re.match(r'([\d.]+)gpm/ft.*?(\d+)ft²\s*\(Actual\s*([\d.]+)ft²\)', line)
-        if m:
+        stripped = line.strip()
+
+        # Job Number (inline on header): "Job Number: M26Y-119"
+        m = re.search(r'Job\s+Number:\s*([A-Za-z0-9\-]+)', stripped)
+        if m and 'contract_no' not in data:
+            data['contract_no'] = m.group(1).strip()
+
+        # Job Name label on one line, value on next
+        if stripped == 'Job Name:' and i+1 < len(lines):
+            val = lines[i+1].strip()
+            if val and 'job_name' not in data:
+                data['job_name'] = val
+
+        # Job Name inline: "Job Name: VIA Womens Health"
+        m = re.match(r'Job\s+Name:\s+(.+)', stripped)
+        if m and 'job_name' not in data:
+            data['job_name'] = m.group(1).strip()
+
+        # Address 1 label on one line, value on next
+        if stripped == 'Address 1' and i+1 < len(lines):
+            val = lines[i+1].strip()
+            if val and 'location' not in data:
+                data['location'] = val
+
+        # Density: "0.10gpm/ft²"
+        m = re.match(r'^([\d.]+)gpm/ft', stripped)
+        if m and 'density' not in data:
             data['density'] = m.group(1)
-            data['area']    = m.group(3)
-        # Sprinkler count
-        if i > 0 and 'Coverage Per Sprinkler' in lines[i-1]:
-            parts = line.split()
-            if len(parts) >= 2:
-                data['num_sprinklers'] = parts[1]
-        # Total Demand flow
-        if i > 0 and 'Total Demand' in lines[i-1]:
-            parts = line.split()
-            if len(parts) >= 1:
-                data['flow_rate'] = parts[0]
-        # System pressure
-        if i > 0 and 'System Pressure Demand' in lines[i-1]:
-            parts = line.split()
-            if len(parts) >= 1:
-                data['pressure'] = parts[0]
-        # Hose stream — look for "Hose Flow" line
-        m_hose = re.search(r'Hose\s*Flow[:\s]+([\d.]+)', line, re.IGNORECASE)
-        if m_hose:
-            data['hose_stream'] = m_hose.group(1)
-        # Also catch format: value on next line after "Hose Flow"
-        if i > 0 and re.search(r'Hose\s*Flow', lines[i-1], re.IGNORECASE):
-            parts = line.split()
-            if parts and re.match(r'[\d.]+', parts[0]):
-                data['hose_stream'] = parts[0]
-        # Date from footer
-        m_date = re.search(r'(\d+)/(\d+)/(\d{4})', line)
-        if m_date and 'year' not in data:
-            data['month'] = m_date.group(1).zfill(2)
-            data['day']   = m_date.group(2).zfill(2)
-            data['year']  = m_date.group(3)
+
+        # Area of Application: "1500ft² (Actual 900.3ft²)"
+        m = re.search(r'(\d+(?:\.\d+)?)ft[²2]\s*\(Actual\s*([\d.]+)ft', stripped)
+        if m and 'area' not in data:
+            data['area'] = m.group(2)
+
+        # Total Demand label then "312.21 @ 51.729" on next line
+        if 'Total Demand' in stripped and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            m = re.match(r'^([\d.]+)\s*@\s*([\d.]+)', nxt)
+            if m and 'flow_rate' not in data:
+                data['flow_rate'] = m.group(1)
+                data['pressure']  = m.group(2)
+
+        # System Pressure Demand label then value on next line
+        if 'System Pressure Demand' in stripped and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            m = re.match(r'^([\d.]+)', nxt)
+            if m and 'pressure' not in data:
+                data['pressure'] = m.group(1)
+
+        # Hose Streams label then value on next line
+        if re.search(r'Hose\s+Stream', stripped, re.IGNORECASE) and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            m = re.match(r'^([\d.]+)', nxt)
+            if m and 'hose_stream' not in data:
+                data['hose_stream'] = m.group(1)
+
+        # Hose Allowance At Source label then value on next line
+        if 'Hose Allowance At Source' in stripped and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            m = re.match(r'^([\d.]+)', nxt)
+            if m and 'hose_stream' not in data:
+                data['hose_stream'] = m.group(1)
+
+        # Hose Flow column header then data row below
+        if 'Hose Flow(gpm)' in stripped and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            parts = nxt.split()
+            nums = [p for p in parts if re.match(r'^[\d.]+$', p)]
+            if len(nums) >= 2 and 'hose_stream' not in data:
+                data['hose_stream'] = nums[1]
+
+        # Number Of Sprinklers Calculated label then value on next line
+        if 'Number Of Sprinklers Calculated' in stripped and i+1 < len(lines):
+            nxt = lines[i+1].strip()
+            m = re.match(r'^(\d+)', nxt)
+            if m and 'num_sprinklers' not in data:
+                data['num_sprinklers'] = m.group(1)
+
+        # Date from footer: "3/3/2026 10:03:10AM"
+        m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', stripped)
+        if m and 'year' not in data:
+            data['month'] = m.group(1).zfill(2)
+            data['day']   = m.group(2).zfill(2)
+            data['year']  = m.group(3)
 
     # Auto-set occupancy based on density
-    if 'occupancy' not in data or not data.get('occupancy'):
+    if not data.get('occupancy'):
         try:
             d = float(data.get('density', 0))
             if d <= 0.10:
@@ -448,41 +491,35 @@ def generate_placard_v2(data):
     RW = W - 0.64*inch
     FH = 0.22*inch
 
-    # Row 1: "This system as shown on" → always Multicraft Fire
     row = H - 0.90*inch
     txt(LM, row, "This system as shown on")
     fx = LM + c.stringWidth("This system as shown on ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, "Multicraft Fire")
 
-    # Row 2: "company print no [blank]  dated [date]"
     row -= 0.35*inch
     txt(LM, row, "company print no")
     fx = LM + c.stringWidth("company print no ", "Helvetica", 9)
-    field(fx, row - 0.04*inch, 1.1*inch, FH, "")  # always blank
+    field(fx, row - 0.04*inch, 1.1*inch, FH, "")
     fx2 = fx + 1.1*inch + 0.08*inch
     txt(fx2, row, "dated")
     fx3 = fx2 + c.stringWidth("dated ", "Helvetica", 9)
     field(fx3, row - 0.04*inch, RW - (fx3 - LM), FH, data.get('date_calc', ''))
 
-    # Row 3: "for [job_name]"
     row -= 0.35*inch
     txt(LM, row, "for")
     fx = LM + c.stringWidth("for ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('job_name', ''))
 
-    # Row 4: "at [location — full width so address always fits]"
     row -= 0.35*inch
     txt(LM, row, "at")
     fx = LM + c.stringWidth("at ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('location', ''), fsize=8)
 
-    # Row 4b: "contract no [job_number]" on its own line
     row -= 0.35*inch
     txt(LM, row, "contract no")
     fx = LM + c.stringWidth("contract no ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('contract_no', ''))
 
-    # Row 5: "is designed to discharge at a rate of [density] gpm"
     row -= 0.38*inch
     txt(LM, row, "is designed to discharge at a rate of")
     fx = LM + c.stringWidth("is designed to discharge at a rate of ", "Helvetica", 9)
@@ -490,17 +527,14 @@ def generate_placard_v2(data):
     fx2 = fx + 1.0*inch + 0.05*inch
     txt(fx2, row, "gpm")
 
-    # Row 6: "(L/min) per sq ft (m2) of floor area over a maximum area of"
     row -= 0.30*inch
     txt(LM, row, "(L/min) per sq ft (m\xb2) of floor area over a maximum area of")
 
-    # Row 7: "[area] sq ft (m2) when supplied"
     row -= 0.30*inch
     field(LM, row - 0.04*inch, 2.0*inch, FH, data.get('area', ''))
     fx = LM + 2.0*inch + 0.08*inch
     txt(fx, row, "sq ft (m\xb2) when supplied")
 
-    # Row 8: "with water at the rate of [flow_rate] gpm (L/min)"
     row -= 0.33*inch
     txt(LM, row, "with water at the rate of")
     fx = LM + c.stringWidth("with water at the rate of ", "Helvetica", 9)
@@ -508,7 +542,6 @@ def generate_placard_v2(data):
     fx2 = fx + 1.4*inch + 0.05*inch
     txt(fx2, row, "gpm (L/min)")
 
-    # Row 9: "at [pressure] psi (bars) at the base of the riser."
     row -= 0.30*inch
     txt(LM, row, "at")
     fx = LM + c.stringWidth("at ", "Helvetica", 9)
@@ -517,38 +550,30 @@ def generate_placard_v2(data):
     txt(fx2, row, "psi (bars) at the base of the riser.")
 
     row -= 0.35*inch
-
-    # Row 10: "Hose stream allowance of [hose_stream] gpm (L/min)"
     txt(LM, row, "Hose stream allowance of")
     fx = LM + c.stringWidth("Hose stream allowance of ", "Helvetica", 9)
     field(fx, row - 0.04*inch, 1.4*inch, FH, data.get('hose_stream', ''))
     fx2 = fx + 1.4*inch + 0.05*inch
     txt(fx2, row, "gpm (L/min)")
 
-    # Row 11: "is included in the above."
     row -= 0.30*inch
     txt(LM, row, "is included in the above.")
 
     row -= 0.38*inch
-
-    # Row 12: "Occupancy classification [auto from density]"
     txt(LM, row, "Occupancy classification")
     fx = LM + c.stringWidth("Occupancy classification ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('occupancy', ''))
 
-    # Row 13: "Commodity classification"
     row -= 0.35*inch
     txt(LM, row, "Commodity classification")
     fx = LM + c.stringWidth("Commodity classification ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('commodity', ''))
 
-    # Row 14: "Maximum storage height"
     row -= 0.35*inch
     txt(LM, row, "Maximum storage height")
     fx = LM + c.stringWidth("Maximum storage height ", "Helvetica", 9)
     field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('storage_height', ''))
 
-    # Installed by
     row -= 0.48*inch
     txt(LM, row, "Installed by:")
     installer_box_y = row - 0.64*inch
