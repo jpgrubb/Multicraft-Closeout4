@@ -256,6 +256,10 @@ document.querySelectorAll(".tab-btn").forEach(function(btn) {
     document.querySelectorAll(".tab-section").forEach(function(s){ s.classList.remove("active"); });
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    // Re-render preview whenever switching to placard tab
+    if (btn.dataset.tab === "placard") {
+      renderPlacardPreview(placardState.placardStyle);
+    }
   });
 });
 
@@ -269,50 +273,9 @@ var placardState = {
   placardStyle: "v1"
 };
 
-// Render initial preview on load
-window.addEventListener("load", function() { renderPlacardPreview("v1"); });
-
 // ─────────────────────────────────────────
-//  TEMPLATE SELECTOR
+//  SVG PREVIEW FUNCTIONS
 // ─────────────────────────────────────────
-document.querySelectorAll(".tmpl-btn").forEach(function(btn) {
-  btn.addEventListener("click", function() {
-    document.querySelectorAll(".tmpl-btn").forEach(function(b){ b.classList.remove("active"); });
-    btn.classList.add("active");
-    placardState.placardStyle = btn.dataset.tmpl;
-    applyTemplateFields(btn.dataset.tmpl);
-    renderPlacardPreview(btn.dataset.tmpl);
-  });
-});
-
-function applyTemplateFields(style) {
-  var v2Fields = document.querySelectorAll(".v2-only");
-  var fieldSprinklers = document.getElementById("field-sprinklers");
-  var fieldDate       = document.getElementById("field-date");
-  if (style === "v2") {
-    v2Fields.forEach(function(el){ el.classList.add("visible"); });
-    fieldSprinklers.style.display = "none";
-    fieldDate.style.display       = "none";
-  } else {
-    v2Fields.forEach(function(el){ el.classList.remove("visible"); });
-    fieldSprinklers.style.display = "";
-    fieldDate.style.display       = "";
-  }
-}
-
-function renderPlacardPreview(style) {
-  var wrap  = document.getElementById("placard-svg-wrap");
-  var badge = document.getElementById("placard-preview-badge");
-  if (!wrap) return;
-  wrap.style.opacity = "0";
-  wrap.style.transition = "opacity .2s";
-  setTimeout(function() {
-    wrap.innerHTML = style === "v2" ? svgV2() : svgV1();
-    badge.textContent = style === "v2" ? "📋 Calculated System Template" : "📊 Standard Template";
-    wrap.style.opacity = "1";
-  }, 180);
-}
-
 function svgV1() {
   var R = "#C0272D";
   var s = '<svg viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg" font-family="Arial,sans-serif">';
@@ -362,40 +325,100 @@ function svgV2() {
   s += '<rect width="220" height="340" fill="' + R + '" rx="4"/>';
   s += '<rect x="5" y="5" width="210" height="330" fill="none" stroke="white" stroke-width="2" rx="3"/>';
   s += '<text x="110" y="24" fill="white" font-size="9" font-weight="bold" text-anchor="middle">Hydraulically Calculated System</text>';
-  function irow(y, label, bx, bw) {
-    s += '<text x="13" y="' + y + '" fill="white" font-size="6">' + label + '</text>';
-    if (bx) s += '<rect x="' + bx + '" y="' + (y-8) + '" width="' + bw + '" height="9" fill="white" rx="1"/>';
-  }
-  irow(38,  "This system as shown on", 95, 110);
+  s += '<text x="13" y="38" fill="white" font-size="6">This system as shown on</text>';
+  s += '<rect x="95" y="30" width="110" height="9" fill="white" rx="1"/>';
   s += '<text x="97" y="38" fill="' + R + '" font-size="6" font-weight="bold">Multicraft Fire</text>';
-  irow(50,  "company print no", 68, 50);
+  s += '<text x="13" y="50" fill="white" font-size="6">company print no</text>';
+  s += '<rect x="68" y="42" width="50" height="9" fill="white" rx="1"/>';
   s += '<text x="122" y="50" fill="white" font-size="6">dated</text>';
   s += '<rect x="141" y="42" width="64" height="9" fill="white" rx="1"/>';
-  irow(62,  "for", 22, 183);
-  irow(74,  "at", 18, 187);
-  irow(86,  "contract no", 58, 147);
-  irow(100, "is designed to discharge at a rate of", 158, 38);
+  s += '<text x="13" y="62" fill="white" font-size="6">for</text>';
+  s += '<rect x="22" y="54" width="183" height="9" fill="white" rx="1"/>';
+  s += '<text x="13" y="74" fill="white" font-size="6">at</text>';
+  s += '<rect x="18" y="66" width="187" height="9" fill="white" rx="1"/>';
+  s += '<text x="13" y="86" fill="white" font-size="6">contract no</text>';
+  s += '<rect x="58" y="78" width="147" height="9" fill="white" rx="1"/>';
+  s += '<text x="13" y="100" fill="white" font-size="6">is designed to discharge at a rate of</text>';
+  s += '<rect x="158" y="92" width="38" height="9" fill="white" rx="1"/>';
   s += '<text x="200" y="100" fill="white" font-size="6">gpm</text>';
   s += '<text x="13" y="112" fill="white" font-size="6">(L/min) per sq ft (m²) of floor area over a maximum area of</text>';
   s += '<rect x="13" y="116" width="80" height="9" fill="white" rx="1"/>';
   s += '<text x="97" y="124" fill="white" font-size="6">sq ft (m²) when supplied</text>';
-  irow(136, "with water at the rate of", 102, 54);
-  s += '<text x="160" y="136" fill="white" font-size="6">gpm (L/min)</text>';
-  irow(148, "at", 18, 54);
+  s += '<text x="13" y="136" fill="white" font-size="6">with water at the rate of</text>';
+  s += '<rect x="103" y="128" width="54" height="9" fill="white" rx="1"/>';
+  s += '<text x="161" y="136" fill="white" font-size="6">gpm (L/min)</text>';
+  s += '<text x="13" y="148" fill="white" font-size="6">at</text>';
+  s += '<rect x="18" y="140" width="54" height="9" fill="white" rx="1"/>';
   s += '<text x="76" y="148" fill="white" font-size="6">psi (bars) at the base of the riser.</text>';
   s += '<text x="13" y="162" fill="white" font-size="6">Hose stream allowance of</text>';
   s += '<rect x="103" y="154" width="56" height="9" fill="white" rx="1"/>';
   s += '<text x="163" y="162" fill="white" font-size="6">gpm (L/min)</text>';
   s += '<text x="13" y="174" fill="white" font-size="6">is included in the above.</text>';
-  irow(190, "Occupancy classification",  102, 103);
-  irow(204, "Commodity classification",  102, 103);
-  irow(218, "Maximum storage height",    102, 103);
+  s += '<text x="13" y="190" fill="white" font-size="6">Occupancy classification</text>';
+  s += '<rect x="102" y="182" width="103" height="9" fill="white" rx="1"/>';
+  s += '<text x="13" y="204" fill="white" font-size="6">Commodity classification</text>';
+  s += '<rect x="102" y="196" width="103" height="9" fill="white" rx="1"/>';
+  s += '<text x="13" y="218" fill="white" font-size="6">Maximum storage height</text>';
+  s += '<rect x="102" y="210" width="103" height="9" fill="white" rx="1"/>';
   s += '<text x="13" y="236" fill="white" font-size="6">Installed by:</text>';
   s += '<rect x="13" y="240" width="194" height="28" fill="white" rx="2"/>';
   s += '<text x="110" y="258" fill="' + R + '" font-size="10" font-weight="bold" text-anchor="middle">MULTICRAFT FIRE</text>';
   s += '</svg>';
   return s;
 }
+
+// ─────────────────────────────────────────
+//  RENDER PREVIEW — always visible, swaps on toggle
+// ─────────────────────────────────────────
+function renderPlacardPreview(style) {
+  var wrap  = document.getElementById("placard-svg-wrap");
+  var badge = document.getElementById("placard-preview-badge");
+  if (!wrap || !badge) return;
+
+  // Fade out
+  wrap.style.transition = "opacity 0.15s ease";
+  wrap.style.opacity = "0";
+
+  setTimeout(function() {
+    wrap.innerHTML = style === "v2" ? svgV2() : svgV1();
+    badge.textContent = style === "v2" ? "📋 Calculated System Template" : "📊 Standard Template";
+    // Fade in
+    wrap.style.opacity = "1";
+  }, 150);
+}
+
+// ─────────────────────────────────────────
+//  TEMPLATE SELECTOR
+// ─────────────────────────────────────────
+document.querySelectorAll(".tmpl-btn").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    document.querySelectorAll(".tmpl-btn").forEach(function(b){ b.classList.remove("active"); });
+    btn.classList.add("active");
+    placardState.placardStyle = btn.dataset.tmpl;
+    applyTemplateFields(btn.dataset.tmpl);
+    renderPlacardPreview(btn.dataset.tmpl);  // immediately update preview
+  });
+});
+
+function applyTemplateFields(style) {
+  var v2Fields = document.querySelectorAll(".v2-only");
+  var fieldSprinklers = document.getElementById("field-sprinklers");
+  var fieldDate       = document.getElementById("field-date");
+  if (style === "v2") {
+    v2Fields.forEach(function(el){ el.classList.add("visible"); });
+    if (fieldSprinklers) fieldSprinklers.style.display = "none";
+    if (fieldDate)       fieldDate.style.display       = "none";
+  } else {
+    v2Fields.forEach(function(el){ el.classList.remove("visible"); });
+    if (fieldSprinklers) fieldSprinklers.style.display = "";
+    if (fieldDate)       fieldDate.style.display       = "";
+  }
+}
+
+// Render preview immediately on page load
+window.addEventListener("load", function() {
+  renderPlacardPreview("v1");
+});
 
 // ─────────────────────────────────────────
 //  CALC FILE UPLOAD
@@ -455,22 +478,22 @@ async function autoExtract(file) {
 }
 
 function populatePlacardFields(d) {
-  document.getElementById("pl-location").value   = d.location      || "";
-  document.getElementById("pl-sprinklers").value = d.num_sprinklers || "";
-  document.getElementById("pl-density").value    = d.density        || "";
-  document.getElementById("pl-area").value       = d.area           || "";
-  document.getElementById("pl-flow").value       = d.flow_rate      || "";
-  document.getElementById("pl-pressure").value   = d.pressure       || "";
-  document.getElementById("pl-month").value      = d.month          || "";
-  document.getElementById("pl-day").value        = d.day            || "";
-  document.getElementById("pl-year").value       = d.year           || "";
-  document.getElementById("pl-hose").value       = d.hose_stream    || "";
-  document.getElementById("pl-occupancy").value  = d.occupancy      || "";
-  document.getElementById("pl-commodity").value  = d.commodity      || "";
-  document.getElementById("pl-storage").value    = d.storage_height || "";
-  document.getElementById("pl-printno").value    = d.print_no       || "";
-  document.getElementById("pl-contractno").value = d.contract_no    || "";
-  document.getElementById("pl-datecalc").value   = d.date_calc      || "";
+  document.getElementById("pl-location").value   = d.location       || "";
+  document.getElementById("pl-sprinklers").value = d.num_sprinklers  || "";
+  document.getElementById("pl-density").value    = d.density         || "";
+  document.getElementById("pl-area").value       = d.area            || "";
+  document.getElementById("pl-flow").value       = d.flow_rate       || "";
+  document.getElementById("pl-pressure").value   = d.pressure        || "";
+  document.getElementById("pl-month").value      = d.month           || "";
+  document.getElementById("pl-day").value        = d.day             || "";
+  document.getElementById("pl-year").value       = d.year            || "";
+  document.getElementById("pl-hose").value       = d.hose_stream     || "";
+  document.getElementById("pl-occupancy").value  = d.occupancy       || "";
+  document.getElementById("pl-commodity").value  = d.commodity       || "";
+  document.getElementById("pl-storage").value    = d.storage_height  || "";
+  document.getElementById("pl-printno").value    = d.print_no        || "";
+  document.getElementById("pl-contractno").value = d.contract_no     || "";
+  document.getElementById("pl-datecalc").value   = d.date_calc       || "";
 }
 
 // ─────────────────────────────────────────
@@ -558,6 +581,7 @@ function resetPlacard() {
   clearPlacardFields();
   placardBtn.disabled = true;
   showPlacardState("idle");
+  renderPlacardPreview(placardState.placardStyle);
 }
 
 function clearPlacardFields() {
@@ -565,4 +589,5 @@ function clearPlacardFields() {
    "pl-month","pl-day","pl-year","pl-hose","pl-occupancy","pl-commodity",
    "pl-storage","pl-printno","pl-contractno","pl-datecalc"]
     .forEach(function(id){ document.getElementById(id).value = ""; });
+}
 }
