@@ -210,8 +210,10 @@ def overlay_pdf(base_path, overlay_bytes, page_index=0):
 @app.route("/placard", methods=["POST"])
 def placard():
     try:
-        body     = request.get_json(force=True)
-        calc_b64 = body.get("calcB64", "")
+        body          = request.get_json(force=True)
+        calc_b64      = body.get("calcB64", "")
+        placard_style = body.get("placardStyle", "v1")  # "v1" or "v2"
+
         if not calc_b64:
             return jsonify({"error": "No calc PDF provided"}), 400
 
@@ -223,7 +225,10 @@ def placard():
             if v:
                 data[k] = v
 
-        pdf = generate_placard(data)
+        if placard_style == "v2":
+            pdf = generate_placard_v2(data)
+        else:
+            pdf = generate_placard(data)
 
         return jsonify({
             "pdf":  base64.b64encode(pdf).decode(),
@@ -275,6 +280,10 @@ def extract_placard_data(pdf_bytes):
 
 
 def generate_placard(data):
+    """
+    Template V1 — 'HYDRAULIC SYSTEM' style placard
+    (existing design with density/area/flow/pressure layout)
+    """
     from reportlab.lib.colors import HexColor, white
     from reportlab.lib.units import inch
 
@@ -378,10 +387,173 @@ def generate_placard(data):
     return buf.read()
 
 
+def generate_placard_v2(data):
+    """
+    Template V2 — 'Hydraulically Calculated System' style placard
+    Matches the red metal plate format with inline fill-in fields for:
+    job name, company print no, date, location, contract no,
+    discharge rate (gpm), area (sq ft), supply flow rate (gpm),
+    supply pressure (psi), hose stream allowance (gpm),
+    occupancy classification, commodity classification,
+    maximum storage height, and installed by.
+    """
+    from reportlab.lib.colors import HexColor, white
+    from reportlab.lib.units import inch
+
+    RED = HexColor('#C0272D')
+    buf = BytesIO()
+    W, H = 5.5 * inch, 7.5 * inch
+    c = rl_canvas.Canvas(buf, pagesize=(W, H))
+
+    # Background
+    c.setFillColor(RED)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
+
+    # Border
+    c.setStrokeColor(white)
+    c.setLineWidth(3)
+    c.rect(0.18*inch, 0.18*inch, W - 0.36*inch, H - 0.36*inch, fill=0, stroke=1)
+
+    # ── Title ──
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 17)
+    c.drawCentredString(W / 2, H - 0.58*inch, "Hydraulically Calculated System")
+
+    # ── Helper: draw an inline white fill box with optional red text ──
+    def field(x, y, w, h=0.22*inch, text="", fsize=9):
+        c.setFillColor(white)
+        c.rect(x, y, w, h, fill=1, stroke=0)
+        if text:
+            c.setFillColor(RED)
+            c.setFont("Helvetica", fsize)
+            # vertically centre text in box
+            c.drawString(x + 0.05*inch, y + h * 0.22, str(text))
+
+    # ── Helper: draw white body text ──
+    def txt(x, y, text, size=9, bold=False):
+        c.setFillColor(white)
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.drawString(x, y, text)
+
+    LM = 0.32*inch   # left margin
+    RW = W - 0.64*inch  # usable width
+    FH = 0.22*inch   # standard field height
+
+    # Row 1: "This system as shown on [job_name]"
+    row = H - 0.90*inch
+    txt(LM, row, "This system as shown on")
+    fx = LM + c.stringWidth("This system as shown on ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('job_name', ''))
+
+    # Row 2: "company print no [print_no]  dated [date]"
+    row -= 0.35*inch
+    txt(LM, row, "company print no")
+    fx = LM + c.stringWidth("company print no ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, 1.1*inch, FH, data.get('print_no', ''))
+    fx2 = fx + 1.1*inch + 0.08*inch
+    txt(fx2, row, "dated")
+    fx3 = fx2 + c.stringWidth("dated ", "Helvetica", 9)
+    field(fx3, row - 0.04*inch, RW - (fx3 - LM), FH, data.get('date_calc', ''))
+
+    # Row 3: "for [project_name]"
+    row -= 0.35*inch
+    txt(LM, row, "for")
+    fx = LM + c.stringWidth("for ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('job_name', ''))
+
+    # Row 4: "at [location]  contract no [contract_no]"
+    row -= 0.35*inch
+    txt(LM, row, "at")
+    fx = LM + c.stringWidth("at ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, 1.8*inch, FH, data.get('location', ''))
+    fx2 = fx + 1.8*inch + 0.08*inch
+    txt(fx2, row, "contract no")
+    fx3 = fx2 + c.stringWidth("contract no ", "Helvetica", 9)
+    field(fx3, row - 0.04*inch, RW - (fx3 - LM), FH, data.get('contract_no', ''))
+
+    # Row 5: "is designed to discharge at a rate of [density] gpm"
+    row -= 0.38*inch
+    txt(LM, row, "is designed to discharge at a rate of")
+    fx = LM + c.stringWidth("is designed to discharge at a rate of ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, 1.0*inch, FH, data.get('density', ''))
+    fx2 = fx + 1.0*inch + 0.05*inch
+    txt(fx2, row, "gpm")
+
+    # Row 6: "(L/min) per sq ft (m2) of floor area over a maximum area of"
+    row -= 0.30*inch
+    txt(LM, row, "(L/min) per sq ft (m\xb2) of floor area over a maximum area of")
+
+    # Row 7: "[area] sq ft (m2) when supplied"
+    row -= 0.30*inch
+    field(LM, row - 0.04*inch, 2.0*inch, FH, data.get('area', ''))
+    fx = LM + 2.0*inch + 0.08*inch
+    txt(fx, row, "sq ft (m\xb2) when supplied")
+
+    # Row 8: "with water at the rate of [flow_rate] gpm (L/min)"
+    row -= 0.33*inch
+    txt(LM, row, "with water at the rate of")
+    fx = LM + c.stringWidth("with water at the rate of ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, 1.4*inch, FH, data.get('flow_rate', ''))
+    fx2 = fx + 1.4*inch + 0.05*inch
+    txt(fx2, row, "gpm (L/min)")
+
+    # Row 9: "at [pressure] psi (bars) at the base of the riser."
+    row -= 0.30*inch
+    txt(LM, row, "at")
+    fx = LM + c.stringWidth("at ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, 1.4*inch, FH, data.get('pressure', ''))
+    fx2 = fx + 1.4*inch + 0.05*inch
+    txt(fx2, row, "psi (bars) at the base of the riser.")
+
+    # Spacer
+    row -= 0.35*inch
+
+    # Row 10: "Hose stream allowance of [hose_stream] gpm (L/min)"
+    txt(LM, row, "Hose stream allowance of")
+    fx = LM + c.stringWidth("Hose stream allowance of ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, 1.4*inch, FH, data.get('hose_stream', ''))
+    fx2 = fx + 1.4*inch + 0.05*inch
+    txt(fx2, row, "gpm (L/min)")
+
+    # Row 11: "is included in the above."
+    row -= 0.30*inch
+    txt(LM, row, "is included in the above.")
+
+    # Spacer
+    row -= 0.38*inch
+
+    # Row 12: "Occupancy classification  [field]"
+    txt(LM, row, "Occupancy classification")
+    fx = LM + c.stringWidth("Occupancy classification ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('occupancy', ''))
+
+    # Row 13: "Commodity classification  [field]"
+    row -= 0.35*inch
+    txt(LM, row, "Commodity classification")
+    fx = LM + c.stringWidth("Commodity classification ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('commodity', ''))
+
+    # Row 14: "Maximum storage height  [field]"
+    row -= 0.35*inch
+    txt(LM, row, "Maximum storage height")
+    fx = LM + c.stringWidth("Maximum storage height ", "Helvetica", 9)
+    field(fx, row - 0.04*inch, RW - (fx - LM), FH, data.get('storage_height', ''))
+
+    # ── Installed by (large white box with company name) ──
+    row -= 0.48*inch
+    txt(LM, row, "Installed by:")
+    installer_box_y = row - 0.64*inch
+    field(LM, installer_box_y, RW, 0.60*inch, fsize=16)
+    # Print company name in RED inside the white box
+    c.setFillColor(RED)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(W / 2, installer_box_y + 0.60*inch * 0.3, "MULTICRAFT FIRE")
+
+    c.save()
+    buf.seek(0)
+    return buf.read()
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
-
-
-
-
